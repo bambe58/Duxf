@@ -5,6 +5,8 @@ import { db } from "../lib/db";
 import { loadCtx } from "../lib/session";
 import { handleDb } from "../lib/table";
 import { handleRpc } from "../lib/rpc";
+import { passwordLogin, passwordSignup } from "../lib/login";
+import { ensureUser } from "../lib/users";
 
 const sel = (ctx: any, t: string, extra: object = {}) => handleDb(ctx, { t, op: "select", ...extra } as any).then((r: any) => r.data);
 const rejects = (p: Promise<unknown>, status?: number) =>
@@ -133,8 +135,13 @@ test("inviti: flusso completo", async () => {
   assert.equal(pb.invites_in.length, 1);
   assert.equal(pb.invites_in[0].from_name, "Francesco");
 
+  assert.equal(pb.invites_in[0].code, undefined); // il codice lo vede solo chi invita
+  const code = pa.invites_out[0].code as string;
+  assert.match(code, /^[A-Z2-9]{8}$/);
+  await rejects(handleRpc(s.b, "answer_invite", { id: pb.invites_in[0].id, accept: true }), 400); // senza codice
+  await rejects(handleRpc(s.b, "answer_invite", { id: pb.invites_in[0].id, accept: true, code: "AAAAAAAA" }), 400);
   const oldHousehold = s.b.hid;
-  await handleRpc(s.b, "answer_invite", { id: pb.invites_in[0].id, accept: true });
+  await handleRpc(s.b, "answer_invite", { id: pb.invites_in[0].id, accept: true, code: code.toLowerCase().slice(0, 4) + "-" + code.slice(4) });
   const b2 = (await loadCtx(db(), s.b.uid))!;
   assert.equal(b2.hid, s.a.hid);
   assert.equal(b2.slot, 2);
@@ -152,6 +159,22 @@ test("inviti: flusso completo", async () => {
   const d = await newUser("MIA@example.com", "Mia");
   const inv = ((await handleRpc(d, "get_profile", {})).data as any).invites_in[0];
   await rejects(handleRpc(s.a, "answer_invite", { id: inv.id, accept: true }), 400);
+});
+
+test("login con email e password", async () => {
+  await freshDb();
+  const uid = await passwordSignup("Mario@Example.com", "Mario", "segretissima");
+  assert.equal(await passwordLogin("mario@example.com", "segretissima"), uid);
+  await rejects(passwordSignup("mario@example.com", "Altro", "altrapassword"), 409);
+  await rejects(passwordSignup("x@example.com", "X", "corta"), 400);
+  await rejects(passwordLogin("mario@example.com", "sbagliata"), 401);
+  await rejects(passwordLogin("nessuno@example.com", "qualunque"), 401);
+  // un account creato con Google non ha password: non si entra con una password
+  await ensureUser("g@example.com", "G");
+  await rejects(passwordLogin("g@example.com", ""), 401);
+  // dopo troppi errori l'account si blocca anche con la password giusta
+  for (let i = 0; i < 8; i++) await passwordLogin("mario@example.com", "no" + i).catch(() => {});
+  await rejects(passwordLogin("mario@example.com", "segretissima"), 429);
 });
 
 test("nomi, tema e password di ripristino", async () => {

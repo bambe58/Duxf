@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { db, type Q } from "./db";
 import { HttpError, toHttpError } from "./http";
 import { addLog, lastVersion } from "./audit";
@@ -23,7 +23,7 @@ async function getProfile(ctx: Ctx) {
        where lower(i.email) = lower($1) and not i.used and i.expires_at > now() order by i.created_at`,
       [ctx.email],
     ),
-    q.query<Row>('select id, email as "to" from invites where household_id = $1 and invited_by = $2 and not used and expires_at > now() order by created_at', [ctx.hid, ctx.uid]),
+    q.query<Row>('select id, email as "to", code from invites where household_id = $1 and invited_by = $2 and not used and expires_at > now() order by created_at', [ctx.hid, ctx.uid]),
   ]);
   return {
     id: me.rows[0].id,
@@ -49,7 +49,9 @@ async function invitePartner(ctx: Ctx, a: Row) {
     const t = await q.query<Row>("select household_id from users where lower(email) = $1", [e]);
     if (t.rows[0] && (await members(q, t.rows[0].household_id)).rows.length > 1) throw fail("questa utenza è già collegata a un'altra famiglia");
     await q.query("delete from invites where household_id = $1 and lower(email) = $2", [ctx.hid, e]); // scaduti
-    await q.query("insert into invites (household_id, email, invited_by) values ($1, $2, $3)", [ctx.hid, e, ctx.uid]);
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // senza caratteri ambigui
+    const code = Array.from({ length: 8 }, () => alphabet[randomInt(alphabet.length)]).join("");
+    await q.query("insert into invites (household_id, email, invited_by, code) values ($1, $2, $3, $4)", [ctx.hid, e, ctx.uid, code]);
   });
 }
 
@@ -58,6 +60,11 @@ async function answerInvite(ctx: Ctx, a: Row) {
   await db().tx(async (q) => {
     const inv = (await q.query<Row>("select * from invites where id = $1 and lower(email) = lower($2) and not used and expires_at > now() for update", [a.id, ctx.email])).rows[0];
     if (!inv) throw fail("invito non trovato");
+    if (a.accept) {
+      // il codice, comunicato a voce dal partner, dimostra che l'invito è davvero per te
+      const given = String(a.code ?? "").replace(/[\s-]/g, "").toUpperCase();
+      if (given !== inv.code) throw fail("codice invito errato");
+    }
     await q.query("delete from invites where id = $1", [inv.id]);
     if (!a.accept) return;
     if ((await members(q, ctx.hid)).rows.length > 1) throw fail("sei già in una famiglia");

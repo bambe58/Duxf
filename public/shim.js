@@ -57,10 +57,15 @@
         try {
           const r = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" });
           const j = await r.json();
+          window.DuoFin.google = !!(j && j.google);
           return { data: { session: j && j.user ? { user: { id: j.user.id } } : null } };
         } catch (_) {
           return { data: { session: null } };
         }
+      },
+      async signInWithPassword(mode, email, password, name) {
+        const r = await post("/api/auth/password", { mode, email, password, name });
+        return { error: r.error };
       },
       signInWithOAuth() {
         location.href = "/api/auth/google";

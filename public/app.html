@@ -266,7 +266,12 @@ svg text{font-family:inherit}
 <div class="lock" id="login">
   <div class="lgo"><svg class="logo" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#c8553d"/><circle cx="25" cy="32" r="14" fill="#fff" opacity=".95"/><circle cx="39" cy="32" r="14" fill="#ffd9cc" opacity=".9"/><path d="M32 22a14 14 0 010 20 14 14 0 010-20z" fill="#c8553d"/></svg></div><div style="font-weight:800;font-size:26px;letter-spacing:-.02em">DuoFin</div>
   <div style="font-size:13px;opacity:.9;margin-top:-6px">Il bilancio di casa, in due</div>
-  <button data-act="google">Continua con Google</button>
+  <div class="lmode"><button class="on" data-act="lmode" data-m="login">Accedi</button><button data-act="lmode" data-m="signup">Crea account</button></div>
+  <input id="lname" type="text" placeholder="Il tuo nome" autocomplete="name" maxlength="40" style="display:none">
+  <input id="lemail" type="email" placeholder="Email" autocomplete="email">
+  <input id="lpw" type="password" placeholder="Password" autocomplete="current-password">
+  <button id="lgo" data-act="lpass">Accedi</button>
+  <button class="gbtn" id="lgoogle" data-act="google" style="display:none">Continua con Google</button>
   <div class="err" id="lerr"></div>
 </div>
 
@@ -861,7 +866,7 @@ function sett() {
  ${P.members.map((u, i) => `<div class="mem"><span class="av" style="background:${avc[i % 2]}">${esc(u.name[0] || "?").toUpperCase()}</span><span class="g"><b>${esc(u.name)}</b>${u.id === P.id ? " (tu)" : ""}<div class="mu">${esc(u.email)}</div></span></div>`).join("")}
  ${P.invites_in.map(i => `<div class="mem"><span class="g"><b>${esc(i.from_name)}</b> ti invita a condividere i conti<div class="mu">${esc(i.from_email)}</div></span><button class="pill on" data-act="ansinv" data-id="${i.id}" data-v="1">Accetta</button><button class="pill" data-act="ansinv" data-id="${i.id}" data-v="0">Rifiuta</button></div>`).join("")}
  ${!other ? `<label>Email della seconda utenza</label><div class="row2"><input id="pe" type="email" placeholder="partner@email.it" autocomplete="off"><button class="pill on" data-act="invite">Invia invito</button></div>
- ${P.invites_out.map(i => `<div class="mem"><span class="g mu">In attesa: ${esc(i.to)}</span><button class="pill" data-act="cancelinv" data-id="${i.id}">Annulla</button></div>`).join("")}
+ ${P.invites_out.map(i => `<div class="mem"><span class="g mu">In attesa: ${esc(i.to)}<br>Codice da dare al partner: <b style="letter-spacing:.12em;color:var(--ink)">${esc(i.code)}</b></span><button class="pill" data-act="cancelinv" data-id="${i.id}">Annulla</button></div>`).join("")}
  <div class="mu" style="margin-top:8px">L'altra persona deve accedere a DuoFin con Google usando questa email e accettare l'invito: da quel momento le due utenze usano gli stessi dati. Ognuna mantiene il proprio aspetto.</div>` : `<div class="mu" style="margin-top:8px">Le due utenze condividono gli stessi dati. Ognuna ha il proprio aspetto.</div>`}
  <label>Il tuo nome</label><div class="row2"><input id="mn" value="${esc(me.name || "")}" maxlength="40"><button class="pill" data-act="myname">Salva</button></div>
  <label>Nome del conto comune</label><div class="row2"><input id="jn" value="${esc(P.joint || "")}"><button class="pill" data-act="jointname">Salva</button></div></div>`;
@@ -1278,6 +1283,8 @@ document.addEventListener("click", async e => {
   else if (a === "biotoggle") { if (localStorage.getItem("casa.bio")) { localStorage.removeItem("casa.bio"); toast("Sblocco biometrico disattivato"); render(); } else bioEnable(); }
   else if (a === "bio-unlock") bioUnlock();
   else if (a === "google") loginGoogle();
+  else if (a === "lmode") setLMode(b.dataset.m);
+  else if (a === "lpass") loginPassword();
   else if (a === "logout") { localStorage.removeItem("casa.bio"); await sb.auth.signOut(); $("#bio").classList.remove("on"); S.tab = "home"; showLogin(); }
 });
 document.addEventListener("click", e => { if (ST.ydd && !e.target.closest(".ddw")) { ST.ydd = false; S.still = true; render(); } });
@@ -1286,14 +1293,34 @@ $("#dlg").addEventListener("click", e => { if (e.target === $("#dlg")) $("#dlg")
 /* ---------------- accesso e avvio ---------------- */
 // mostra la schermata di login e svuota la vista
 function showLogin() { $("#login").classList.add("on"); $("#view").innerHTML = ""; $("#yrs").innerHTML = ""; }
+// accesso con email e password (o creazione dell'account)
+let LMODE = "login";
+function setLMode(m) {
+  LMODE = m; $("#lerr").textContent = "";
+  document.querySelectorAll("#login .lmode button").forEach(x => x.classList.toggle("on", x.dataset.m === m));
+  $("#lname").style.display = m === "signup" ? "" : "none";
+  $("#lpw").autocomplete = m === "signup" ? "new-password" : "current-password";
+  $("#lgo").textContent = m === "signup" ? "Crea account" : "Accedi";
+}
+async function loginPassword() {
+  const email = $("#lemail").value.trim(), pw = $("#lpw").value, err = $("#lerr"); err.textContent = "";
+  if (!email || !pw) { err.textContent = "Inserisci email e password."; return; }
+  if (LMODE === "signup" && pw.length < 8) { err.textContent = "La password deve avere almeno 8 caratteri."; return; }
+  const b = $("#lgo"); b.disabled = true;
+  const { error } = await sb.auth.signInWithPassword(LMODE, email, pw, $("#lname").value.trim());
+  b.disabled = false;
+  if (error) { err.textContent = error.message; return; }
+  $("#lpw").value = ""; $("#login").classList.remove("on"); start();
+}
+$("#lpw").addEventListener("keydown", e => { if (e.key === "Enter") loginPassword(); });
 // accesso con Google: la pagina viene portata a Google e torna qui con la sessione attiva
 async function loginGoogle() { await sb.auth.signInWithOAuth({ provider: "google" }); }
 // risposta a un invito per condividere il conto
 function askInvite(id, accept) {
-  const go = async () => { $("#dlg").close(); const { error } = await sb.rpc("answer_invite", { id, accept }); if (error) return toast("Errore: " + error.message); await loadProfile(); await loadAll(); render(); toast(accept ? "Utenze collegate" : "Invito rifiutato"); };
+  const go = async () => { const code = accept ? ($("#invcode") ? $("#invcode").value : "") : ""; if (accept && !code.trim()) return toast("Inserisci il codice invito"); $("#dlg").close(); const { error } = await sb.rpc("answer_invite", { id, accept, code }); if (error) return toast("Errore: " + error.message); await loadProfile(); await loadAll(); render(); toast(accept ? "Utenze collegate" : "Invito rifiutato"); };
   if (!accept) return go();
   const mine = S.tx.length;
-  dlg(`<h2>Collegare le utenze?</h2><div class="mu">${mine ? `I dati che hai ora in questo account (${mine} movimenti) non saranno più visibili: userai quelli della famiglia.` : "Userai gli stessi dati dell'altra utenza."} Il tuo aspetto resta quello che hai scelto.</div><button class="btn" id="invok">Collega</button><button class="btn s" data-act="close">Annulla</button>`);
+  dlg(`<h2>Collegare le utenze?</h2><div class="mu">${mine ? `I dati che hai ora in questo account (${mine} movimenti) non saranno più visibili: userai quelli della famiglia.` : "Userai gli stessi dati dell'altra utenza."} Il tuo aspetto resta quello che hai scelto.</div><label>Codice invito (te lo dà chi ti ha invitato)</label><input id="invcode" autocomplete="off" autocapitalize="characters" maxlength="12" placeholder="XXXX-XXXX"><button class="btn" id="invok">Collega</button><button class="btn s" data-act="close">Annulla</button>`);
   $("#invok").onclick = go;
 }
 // avvio dopo l'accesso: verifica l'abilitazione, carica i dati, ascolta le modifiche, genera le ricorrenze, mostra gli inviti
@@ -1310,6 +1337,7 @@ async function start() {
   const qs = new URLSearchParams(location.hash.replace(/^#/, "") + "&" + location.search.replace(/^\?/, ""));
   if (qs.get("error_description")) { history.replaceState(null, "", location.pathname); showLogin(); $("#lerr").textContent = "Accesso con Google non riuscito."; return; }
   const { data: { session } } = await sb.auth.getSession();
+  $("#lgoogle").style.display = sb.google ? "" : "none";
   if (session) start(); else showLogin();
 })();
 </script></body></html>
