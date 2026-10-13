@@ -393,6 +393,8 @@ async function loadAll() {
   skinColors(); YC = {};
 }
 let P = { members: [], invites_in: [], invites_out: [] };
+let WIPE = null; // sblocco della cancellazione: { token, until }
+const wipeOpen = () => !!(WIPE && Date.now() < WIPE.until);
 // legge nome, tema e nome del conto comune dell'utente collegato
 async function loadProfile() {
   const { data, error } = await sb.rpc("get_profile"); if (error) throw error;
@@ -884,6 +886,8 @@ function sett() {
  <div class="mu" style="margin-top:8px">Le categorie archiviate non compaiono nelle nuove spese ma restano nello storico.</div></div>
  <div class="card"><h2>Dati</h2><button class="btn s" style="margin-top:0" data-act="csvall">Esporta tutte le movimentazioni (CSV)</button><button class="btn s" data-act="csv">Esporta solo il ${y} (CSV)</button><button class="btn s" data-act="log">Registro modifiche</button>
 <button class="btn s" data-act="backup">Backup completo (.json)</button><button class="btn s" data-act="restore">Ripristina da backup</button></div>
+ <div class="card"><h2>Dati di prova e azzeramento</h2><button class="btn s" style="margin-top:0" data-act="seeddemo">Inserisci dati di prova</button><div class="mu" style="margin-top:6px">Aggiunge movimenti inventati degli ultimi mesi (solo se non ce ne sono già).</div>
+ ${wipeOpen() ? `<button class="btn d" data-act="wipe">Cancella tutti i dati</button><div class="mu" style="margin-top:6px">Sbloccato per pochi minuti. Alla pressione ti verrà chiesta un'altra password.</div>` : `<button class="btn s" data-act="wipeunlock">🔒 Sblocca la cancellazione</button><div class="mu" style="margin-top:6px">Per attivare il pulsante serve la password di ripristino${P.has_pw ? "" : " (non ancora impostata: vedi Sicurezza)"}.</div>`}</div>
  <div class="card"><h2>Sicurezza</h2><button class="btn s" style="margin-top:0" data-act="biotoggle">${bioOn ? "Disattiva" : "Attiva"} sblocco con Face ID / impronta</button>
  <button class="btn s" data-act="setpw">${P.has_pw ? "Cambia" : "Imposta"} password di ripristino backup</button><div class="mu" style="margin-top:6px">${P.has_pw ? "Password di ripristino impostata." : "Non ancora impostata: senza non si può ripristinare un backup."}</div>
 <button class="btn s" data-act="logout">Esci dall'account</button></div></div>`;
@@ -1281,11 +1285,33 @@ document.addEventListener("click", async e => {
     } catch (_) { err("File non valido."); }
   }
   else if (a === "biotoggle") { if (localStorage.getItem("casa.bio")) { localStorage.removeItem("casa.bio"); toast("Sblocco biometrico disattivato"); render(); } else bioEnable(); }
+  else if (a === "seeddemo") {
+    if (!armed) { armed = true; b.textContent = "Conferma: inserisci dati di prova"; return; }
+    armed = false; b.disabled = true;
+    const { error } = await sb.rpc("seed_demo");
+    b.disabled = false; if (error) return toast(error.message.charAt(0).toUpperCase() + error.message.slice(1));
+    S.year = new Date().getFullYear(); await loadAll(); render(); toast("Dati di prova inseriti");
+  }
+  else if (a === "wipeunlock") dlg(`<h2>Sblocca la cancellazione</h2><div class="mu">Inserisci la password di ripristino. Servirà per attivare il pulsante che cancella tutti i dati.</div><label>Password di ripristino</label><input id="wp1" type="password" autocomplete="off"><div class="mu" id="wm" style="margin-top:8px;min-height:16px"></div><button class="btn" data-act="dowipeunlock">Sblocca</button><button class="btn s" data-act="close">Annulla</button>`);
+  else if (a === "dowipeunlock") {
+    const { data, error } = await sb.rpc("wipe_unlock", { pw: $("#wp1").value });
+    if (error) { $("#wm").textContent = error.message.charAt(0).toUpperCase() + error.message.slice(1); $("#wm").style.color = "#e5484d"; return; }
+    WIPE = { token: data, until: Date.now() + 9 * 60 * 1000 }; $("#dlg").close(); render(); toast("Cancellazione sbloccata per 9 minuti");
+  }
+  else if (a === "wipe") dlg(`<h2>Cancellare tutti i dati?</h2><div class="mu">Verranno eliminati tutti i movimenti, le ricorrenze, le quote e le categorie (restano quelle di partenza). Utenti e storico delle modifiche restano. <b>Non si può annullare.</b> Se ti serve, fai prima un backup.</div><label>Password del tuo account</label><input id="wp2" type="password" autocomplete="current-password"><div class="mu" id="wm" style="margin-top:8px;min-height:16px"></div><button class="btn d" data-act="dowipe">Cancella tutto</button><button class="btn s" data-act="close">Annulla</button>`);
+  else if (a === "dowipe") {
+    if (!wipeOpen()) { $("#dlg").close(); render(); return toast("Sblocco scaduto: ripeti il primo passaggio"); }
+    b.disabled = true;
+    const { error } = await sb.rpc("wipe_all", { token: WIPE.token, pw: $("#wp2").value });
+    b.disabled = false;
+    if (error) { $("#wm").textContent = error.message.charAt(0).toUpperCase() + error.message.slice(1); $("#wm").style.color = "#e5484d"; if (/scadut/.test(error.message)) WIPE = null; return; }
+    WIPE = null; $("#dlg").close(); await loadAll(); render(); toast("Tutti i dati sono stati cancellati");
+  }
   else if (a === "bio-unlock") bioUnlock();
   else if (a === "google") loginGoogle();
   else if (a === "lmode") setLMode(b.dataset.m);
   else if (a === "lpass") loginPassword();
-  else if (a === "logout") { localStorage.removeItem("casa.bio"); await sb.auth.signOut(); $("#bio").classList.remove("on"); S.tab = "home"; showLogin(); }
+  else if (a === "logout") { WIPE = null; localStorage.removeItem("casa.bio"); await sb.auth.signOut(); $("#bio").classList.remove("on"); S.tab = "home"; showLogin(); }
 });
 document.addEventListener("click", e => { if (ST.ydd && !e.target.closest(".ddw")) { ST.ydd = false; S.still = true; render(); } });
 $("#dlg").addEventListener("click", e => { if (e.target === $("#dlg")) $("#dlg").close(); });

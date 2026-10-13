@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db, type Q } from "./db";
 
 const DEFCATS: [string, string, string, string[]][] = [
   ["Casa", "#3d6bff", "casa", ["Affitto / mutuo", "Utenze"]],
@@ -26,6 +26,14 @@ export async function ensureUser(email: string, name: string): Promise<string> {
   }
 }
 
+/** Categorie e sottocategorie di partenza di un nuovo nucleo. */
+export async function seedDefaults(q: Q, hid: string) {
+  for (const [n, color, icon, subs] of DEFCATS) {
+    const c = await q.query<{ id: string }>("insert into categories (household_id, name, color, icon) values ($1,$2,$3,$4) returning id", [hid, n, color, icon]);
+    for (const s of subs) await q.query("insert into subcategories (household_id, category_id, name) values ($1,$2,$3)", [hid, c.rows[0].id, s]);
+  }
+}
+
 function create(e: string, display: string): Promise<string> {
   return db().tx(async (q) => {
     const again = await q.query<{ id: string }>("select id from users where lower(email) = $1", [e]);
@@ -33,10 +41,7 @@ function create(e: string, display: string): Promise<string> {
     const h = await q.query<{ id: string }>("insert into households default values returning id");
     const hid = h.rows[0].id;
     const u = await q.query<{ id: string }>("insert into users (household_id, email, name, slot) values ($1, $2, $3, 1) returning id", [hid, e, display]);
-    for (const [n, color, icon, subs] of DEFCATS) {
-      const c = await q.query<{ id: string }>("insert into categories (household_id, name, color, icon) values ($1,$2,$3,$4) returning id", [hid, n, color, icon]);
-      for (const s of subs) await q.query("insert into subcategories (household_id, category_id, name) values ($1,$2,$3)", [hid, c.rows[0].id, s]);
-    }
+    await seedDefaults(q, hid);
     return u.rows[0].id;
   });
 }

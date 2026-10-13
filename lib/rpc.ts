@@ -4,7 +4,9 @@ import { HttpError, toHttpError } from "./http";
 import { addLog, lastVersion } from "./audit";
 import { hashPassword, verifyPassword } from "./password";
 import { SKINS, UUID, cleanName, cleanPayload, normPayer } from "./validate";
-import type { Ctx } from "./session";
+import { readState, signState, type Ctx } from "./session";
+import { clearFails, recordFail, tooMany } from "./login";
+import { seedDemo, wipeAll } from "./demo";
 
 type Row = Record<string, any>;
 const fail = (m: string, status = 400) => new HttpError(status, m);
@@ -197,6 +199,41 @@ export async function handleRpc(ctx: Ctx, n: string, a: Row) {
           if (stored && !(typeof a.old === "string" && verifyPassword(a.old, stored))) throw fail("password attuale errata");
           await q.query("update households set backup_password_hash = $1 where id = $2", [hashPassword(nw), ctx.hid]);
         });
+        return { error: null };
+      }
+      case "seed_demo": {
+        const n = await db().tx((q) => seedDemo(q, ctx));
+        return { data: n, error: null };
+      }
+      case "wipe_unlock": {
+        // primo passo: password di ripristino del nucleo -> gettone valido 10 minuti
+        const key = "wipe:" + ctx.uid;
+        await tooMany(key);
+        const stored = (await db().query<Row>("select backup_password_hash from households where id = $1", [ctx.hid])).rows[0]?.backup_password_hash;
+        if (!stored) throw fail("password di ripristino non impostata");
+        if (typeof a.pw !== "string" || !verifyPassword(a.pw, stored)) {
+          await recordFail(key);
+          throw fail("password errata");
+        }
+        await clearFails(key);
+        return { data: await signState({ purpose: "wipe", sub: ctx.uid }), error: null };
+      }
+      case "wipe_all": {
+        // secondo passo: gettone del primo passo + password dell'account
+        const key = "wipe:" + ctx.uid;
+        await tooMany(key);
+        const t = await readState(typeof a.token === "string" ? a.token : undefined);
+        if (!t || t.purpose !== "wipe" || t.sub !== ctx.uid) throw fail("sblocco scaduto: ripeti il primo passaggio", 403);
+        const me = (await db().query<Row>("select password_hash from users where id = $1", [ctx.uid])).rows[0];
+        const hh = (await db().query<Row>("select backup_password_hash from households where id = $1", [ctx.hid])).rows[0];
+        // chi accede con Google non ha una password dell'account: gli si chiede di nuovo quella di ripristino
+        const hash = me?.password_hash ?? hh?.backup_password_hash;
+        if (typeof a.pw !== "string" || !hash || !verifyPassword(a.pw, hash)) {
+          await recordFail(key);
+          throw fail("password errata");
+        }
+        await clearFails(key);
+        await db().tx((q) => wipeAll(q, ctx));
         return { error: null };
       }
       case "restore_backup":

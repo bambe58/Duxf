@@ -9,7 +9,7 @@ const DUMMY = hashPassword("dummy-password-for-timing");
 
 export const validPassword = (p: unknown): p is string => typeof p === "string" && p.length >= 8 && p.length <= 200;
 
-async function tooMany(email: string) {
+export async function tooMany(email: string) {
   const r = await db().query<{ n: number }>("select count(*)::int as n from auth_attempts where email = $1 and at > now() - interval '15 minutes'", [email]);
   if (r.rows[0].n >= MAX_FAILS) throw new HttpError(429, "Troppi tentativi, riprova tra qualche minuto");
 }
@@ -41,3 +41,7 @@ export async function passwordSignup(emailRaw: unknown, nameRaw: unknown, passwo
   await db().query("update users set password_hash = $1 where id = $2 and password_hash is null", [hashPassword(password), uid]);
   return uid;
 }
+
+/** Tentativi sbagliati su operazioni sensibili (chiave libera, es. "wipe:<utente>"). */
+export const recordFail = (key: string) => db().query("insert into auth_attempts (email) values ($1)", [key]);
+export const clearFails = (key: string) => db().query("delete from auth_attempts where email = $1", [key]);

@@ -7,6 +7,7 @@ import { handleDb } from "../lib/table";
 import { handleRpc } from "../lib/rpc";
 import { passwordLogin, passwordSignup } from "../lib/login";
 import { ensureUser } from "../lib/users";
+import { hashPassword } from "../lib/password";
 
 const sel = (ctx: any, t: string, extra: object = {}) => handleDb(ctx, { t, op: "select", ...extra } as any).then((r: any) => r.data);
 const rejects = (p: Promise<unknown>, status?: number) =>
@@ -247,4 +248,34 @@ test("last_change cambia a ogni modifica", async () => {
   assert.ok(r.v > v0);
   assert.equal((await handleRpc(s.a, "last_change", {})).data, r.v);
   assert.equal((await handleRpc(s.b, "last_change", {})).data, 0);
+});
+
+test("dati di prova e cancellazione con doppia password", async () => {
+  const s = await setup();
+  await handleRpc(s.a, "set_restore_password", { new: "ripristino1" });
+  const n = ((await handleRpc(s.a, "seed_demo", {})) as any).data;
+  assert.ok(n > 40);
+  const txs = await sel(s.a, "transactions");
+  assert.equal(txs.length, n);
+  assert.ok(txs.every((t: any) => t.tx_date <= new Date().toISOString().slice(0, 10)));
+  await rejects(handleRpc(s.a, "seed_demo", {}), 400); // già pieno
+  // l'altro nucleo non vede nulla
+  assert.equal((await sel(s.b, "transactions")).length, 0);
+
+  // senza sblocco o con password sbagliate non si cancella
+  await rejects(handleRpc(s.a, "wipe_all", { token: "x", pw: "qualunque" }), 403);
+  await rejects(handleRpc(s.a, "wipe_unlock", { pw: "sbagliata" }), 400);
+  const token = ((await handleRpc(s.a, "wipe_unlock", { pw: "ripristino1" })) as any).data as string;
+  await rejects(handleRpc(s.b, "wipe_all", { token, pw: "x" }), 403); // il gettone è personale
+  await rejects(handleRpc(s.a, "wipe_all", { token, pw: "sbagliata" }), 400);
+  assert.equal((await sel(s.a, "transactions")).length, n);
+
+  // account con password: il secondo passo vuole quella dell'account
+  await db().query("update users set password_hash = $1 where id = $2", [hashPassword("accesso123"), s.a.uid]);
+  await rejects(handleRpc(s.a, "wipe_all", { token, pw: "ripristino1" }), 400);
+  await handleRpc(s.a, "wipe_all", { token, pw: "accesso123" });
+  assert.equal((await sel(s.a, "transactions")).length, 0);
+  assert.equal((await sel(s.a, "categories")).length, 5);
+  const log = (await sel(s.a, "audit_log")).map((l: any) => l.summary);
+  assert.ok(log.includes("Tutti i dati cancellati"));
 });
