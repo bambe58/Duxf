@@ -257,10 +257,8 @@ test("last_change cambia a ogni modifica", async () => {
   assert.equal((await handleRpc(s.b, "last_change", {})).data, 0);
 });
 
-test("dati di prova e cancellazione con doppia password", async () => {
+test("dati di prova e cancellazione con le parole attiva e cancella", async () => {
   const s = await setup();
-  process.env.WIPE_UNLOCK_HASH = hashPassword("sblocco1");
-  process.env.WIPE_CONFIRM_HASH = hashPassword("conferma1");
   const n = ((await handleRpc(s.a, "seed_demo", {})) as any).data;
   assert.ok(n > 600);
   const txs = await sel(s.a, "transactions");
@@ -275,13 +273,18 @@ test("dati di prova e cancellazione con doppia password", async () => {
   // senza sblocco o con password sbagliate non si cancella
   await rejects(handleRpc(s.a, "wipe_all", { token: "x", pw: "qualunque" }), 403);
   await rejects(handleRpc(s.a, "wipe_unlock", { pw: "sbagliata" }), 400);
-  const token = ((await handleRpc(s.a, "wipe_unlock", { pw: "sblocco1" })) as any).data as string;
+  const token = ((await handleRpc(s.a, "wipe_unlock", { pw: " Attiva " })) as any).data as string;
   await rejects(handleRpc(s.b, "wipe_all", { token, pw: "x" }), 403); // il gettone è personale
   await rejects(handleRpc(s.a, "wipe_all", { token, pw: "sbagliata" }), 400);
+  const other = await handleRpc(s.b, "seed_demo", {}); // dati di un altro nucleo
+  const otherCount = (await sel(s.b, "transactions")).length;
+  assert.ok(otherCount > 0 && (other as any).data === otherCount);
   assert.equal((await sel(s.a, "transactions")).length, n);
 
-  await rejects(handleRpc(s.a, "wipe_all", { token, pw: "sblocco1" }), 400); // la password di sblocco non basta
-  await handleRpc(s.a, "wipe_all", { token, pw: "conferma1" });
+  await rejects(handleRpc(s.a, "wipe_all", { token, pw: "attiva" }), 400); // "attiva" non basta
+  await handleRpc(s.a, "wipe_all", { token, pw: "Cancella" });
+  assert.equal((await sel(s.b, "transactions")).length, otherCount); // l'altro nucleo non è toccato
+  assert.equal((await sel(s.b, "categories")).length, 5);
   assert.equal((await sel(s.a, "transactions")).length, 0);
   assert.equal((await sel(s.a, "categories")).length, 5);
   const log = (await sel(s.a, "audit_log")).map((l: any) => l.summary);

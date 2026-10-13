@@ -39,4 +39,4 @@ isolamento tra nuclei, regole sui movimenti, registro modifiche, ricorrenze, inv
 
 ## Registrazioni e cancellazione totale
 - Le registrazioni sono **chiuse** (anche per i nuovi accessi con Google). Per riaprirle imposta `SIGNUP_OPEN=1`.
-- "Cancella tutti i dati" richiede due password diverse, verificate sul server: `WIPE_UNLOCK_HASH` (sblocca il pulsante per 10 minuti) e `WIPE_CONFIRM_HASH` (conferma). Sono salvate solo come hash scrypt nelle variabili d'ambiente, mai nel codice.
+- "Cancella tutti i dati" richiede due passaggi: scrivere `attiva` (abilita il pulsante per 10 minuti) e poi `cancella`. Non sono password segrete, ma una protezione contro i tocchi accidentali; il server richiede comunque i due passaggi in ordine. Cancella solo i dati del nucleo di chi la esegue.

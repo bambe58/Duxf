@@ -10,6 +10,7 @@ import { seedDemo, wipeAll } from "./demo";
 
 type Row = Record<string, any>;
 const fail = (m: string, status = 400) => new HttpError(status, m);
+const isWord = (v: unknown, w: string) => typeof v === "string" && v.trim().toLowerCase() === w;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const members = (q: Q, hid: string) => q.query<Row>("select id, name, email from users where household_id = $1 order by slot", [hid]);
@@ -206,29 +207,25 @@ export async function handleRpc(ctx: Ctx, n: string, a: Row) {
         return { data: n, error: null };
       }
       case "wipe_unlock": {
-        // primo passo: password di sblocco (WIPE_UNLOCK_HASH) -> gettone valido 10 minuti
+        // primo passo: scrivere "attiva" -> gettone valido 10 minuti
         const key = "wipe:" + ctx.uid;
         await tooMany(key);
-        const hash = process.env.WIPE_UNLOCK_HASH;
-        if (!hash) throw fail("cancellazione non configurata", 403);
-        if (typeof a.pw !== "string" || !verifyPassword(a.pw, hash)) {
+        if (!isWord(a.pw, "attiva")) {
           await recordFail(key);
-          throw fail("password errata");
+          throw fail("scrivi la parola richiesta: attiva");
         }
         await clearFails(key);
         return { data: await signState({ purpose: "wipe", sub: ctx.uid }), error: null };
       }
       case "wipe_all": {
-        // secondo passo: gettone del primo passo + password di conferma (WIPE_CONFIRM_HASH)
+        // secondo passo: gettone del primo passo + scrivere "cancella"
         const key = "wipe:" + ctx.uid;
         await tooMany(key);
         const t = await readState(typeof a.token === "string" ? a.token : undefined);
         if (!t || t.purpose !== "wipe" || t.sub !== ctx.uid) throw fail("sblocco scaduto: ripeti il primo passaggio", 403);
-        const hash = process.env.WIPE_CONFIRM_HASH;
-        if (!hash) throw fail("cancellazione non configurata", 403);
-        if (typeof a.pw !== "string" || !verifyPassword(a.pw, hash)) {
+        if (!isWord(a.pw, "cancella")) {
           await recordFail(key);
-          throw fail("password errata");
+          throw fail("scrivi la parola richiesta: cancella");
         }
         await clearFails(key);
         await db().tx((q) => wipeAll(q, ctx));
