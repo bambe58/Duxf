@@ -7,6 +7,9 @@ const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const MAX_FAILS = 8; // tentativi sbagliati ogni 15 minuti per email
 const DUMMY = hashPassword("dummy-password-for-timing");
 
+/** Le registrazioni sono chiuse a meno di SIGNUP_OPEN=1. */
+export const signupOpen = () => process.env.SIGNUP_OPEN === "1";
+
 export const validPassword = (p: unknown): p is string => typeof p === "string" && p.length >= 8 && p.length <= 200;
 
 export async function tooMany(email: string) {
@@ -32,6 +35,7 @@ export async function passwordLogin(emailRaw: unknown, password: unknown): Promi
 
 /** Crea un nuovo account (e il suo nucleo) con email e password. */
 export async function passwordSignup(emailRaw: unknown, nameRaw: unknown, password: unknown): Promise<string> {
+  if (!signupOpen()) throw new HttpError(403, "Le registrazioni sono chiuse");
   const email = String(emailRaw ?? "").trim().toLowerCase();
   if (!EMAIL.test(email) || email.length > 200) throw new HttpError(400, "Email non valida");
   if (!validPassword(password)) throw new HttpError(400, "La password deve avere almeno 8 caratteri");

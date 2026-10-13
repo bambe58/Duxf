@@ -162,8 +162,15 @@ test("inviti: flusso completo", async () => {
   await rejects(handleRpc(s.a, "answer_invite", { id: inv.id, accept: true }), 400);
 });
 
+test("registrazioni chiuse di default", async () => {
+  await freshDb();
+  delete process.env.SIGNUP_OPEN;
+  await rejects(passwordSignup("nuovo@example.com", "N", "unapassword1"), 403);
+});
+
 test("login con email e password", async () => {
   await freshDb();
+  process.env.SIGNUP_OPEN = "1";
   const uid = await passwordSignup("Mario@Example.com", "Mario", "segretissima");
   assert.equal(await passwordLogin("mario@example.com", "segretissima"), uid);
   await rejects(passwordSignup("mario@example.com", "Altro", "altrapassword"), 409);
@@ -252,7 +259,8 @@ test("last_change cambia a ogni modifica", async () => {
 
 test("dati di prova e cancellazione con doppia password", async () => {
   const s = await setup();
-  await handleRpc(s.a, "set_restore_password", { new: "ripristino1" });
+  process.env.WIPE_UNLOCK_HASH = hashPassword("sblocco1");
+  process.env.WIPE_CONFIRM_HASH = hashPassword("conferma1");
   const n = ((await handleRpc(s.a, "seed_demo", {})) as any).data;
   assert.ok(n > 40);
   const txs = await sel(s.a, "transactions");
@@ -265,15 +273,13 @@ test("dati di prova e cancellazione con doppia password", async () => {
   // senza sblocco o con password sbagliate non si cancella
   await rejects(handleRpc(s.a, "wipe_all", { token: "x", pw: "qualunque" }), 403);
   await rejects(handleRpc(s.a, "wipe_unlock", { pw: "sbagliata" }), 400);
-  const token = ((await handleRpc(s.a, "wipe_unlock", { pw: "ripristino1" })) as any).data as string;
+  const token = ((await handleRpc(s.a, "wipe_unlock", { pw: "sblocco1" })) as any).data as string;
   await rejects(handleRpc(s.b, "wipe_all", { token, pw: "x" }), 403); // il gettone è personale
   await rejects(handleRpc(s.a, "wipe_all", { token, pw: "sbagliata" }), 400);
   assert.equal((await sel(s.a, "transactions")).length, n);
 
-  // account con password: il secondo passo vuole quella dell'account
-  await db().query("update users set password_hash = $1 where id = $2", [hashPassword("accesso123"), s.a.uid]);
-  await rejects(handleRpc(s.a, "wipe_all", { token, pw: "ripristino1" }), 400);
-  await handleRpc(s.a, "wipe_all", { token, pw: "accesso123" });
+  await rejects(handleRpc(s.a, "wipe_all", { token, pw: "sblocco1" }), 400); // la password di sblocco non basta
+  await handleRpc(s.a, "wipe_all", { token, pw: "conferma1" });
   assert.equal((await sel(s.a, "transactions")).length, 0);
   assert.equal((await sel(s.a, "categories")).length, 5);
   const log = (await sel(s.a, "audit_log")).map((l: any) => l.summary);

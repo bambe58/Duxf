@@ -36,3 +36,7 @@ isolamento tra nuclei, regole sui movimenti, registro modifiche, ricorrenze, inv
 - Il ripristino invia il backup in una sola richiesta: su Vercel il limite è circa 4,5 MB (decine di migliaia di movimenti).
 - Gli inviti non inviano email: la seconda persona deve accedere con la stessa email indicata e accettare dalle Impostazioni.
 - Gli aggiornamenti dall'altro dispositivo arrivano con un controllo ogni 25 secondi (non in tempo reale).
+
+## Registrazioni e cancellazione totale
+- Le registrazioni sono **chiuse** (anche per i nuovi accessi con Google). Per riaprirle imposta `SIGNUP_OPEN=1`.
+- "Cancella tutti i dati" richiede due password diverse, verificate sul server: `WIPE_UNLOCK_HASH` (sblocca il pulsante per 10 minuti) e `WIPE_CONFIRM_HASH` (conferma). Sono salvate solo come hash scrypt nelle variabili d'ambiente, mai nel codice.

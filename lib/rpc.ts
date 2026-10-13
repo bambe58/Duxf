@@ -206,12 +206,12 @@ export async function handleRpc(ctx: Ctx, n: string, a: Row) {
         return { data: n, error: null };
       }
       case "wipe_unlock": {
-        // primo passo: password di ripristino del nucleo -> gettone valido 10 minuti
+        // primo passo: password di sblocco (WIPE_UNLOCK_HASH) -> gettone valido 10 minuti
         const key = "wipe:" + ctx.uid;
         await tooMany(key);
-        const stored = (await db().query<Row>("select backup_password_hash from households where id = $1", [ctx.hid])).rows[0]?.backup_password_hash;
-        if (!stored) throw fail("password di ripristino non impostata");
-        if (typeof a.pw !== "string" || !verifyPassword(a.pw, stored)) {
+        const hash = process.env.WIPE_UNLOCK_HASH;
+        if (!hash) throw fail("cancellazione non configurata", 403);
+        if (typeof a.pw !== "string" || !verifyPassword(a.pw, hash)) {
           await recordFail(key);
           throw fail("password errata");
         }
@@ -219,16 +219,14 @@ export async function handleRpc(ctx: Ctx, n: string, a: Row) {
         return { data: await signState({ purpose: "wipe", sub: ctx.uid }), error: null };
       }
       case "wipe_all": {
-        // secondo passo: gettone del primo passo + password dell'account
+        // secondo passo: gettone del primo passo + password di conferma (WIPE_CONFIRM_HASH)
         const key = "wipe:" + ctx.uid;
         await tooMany(key);
         const t = await readState(typeof a.token === "string" ? a.token : undefined);
         if (!t || t.purpose !== "wipe" || t.sub !== ctx.uid) throw fail("sblocco scaduto: ripeti il primo passaggio", 403);
-        const me = (await db().query<Row>("select password_hash from users where id = $1", [ctx.uid])).rows[0];
-        const hh = (await db().query<Row>("select backup_password_hash from households where id = $1", [ctx.hid])).rows[0];
-        // chi accede con Google non ha una password dell'account: gli si chiede di nuovo quella di ripristino
-        const hash = me?.password_hash ?? hh?.backup_password_hash;
-        if (typeof a.pw !== "string" || !hash || !verifyPassword(a.pw, hash)) {
+        const hash = process.env.WIPE_CONFIRM_HASH;
+        if (!hash) throw fail("cancellazione non configurata", 403);
+        if (typeof a.pw !== "string" || !verifyPassword(a.pw, hash)) {
           await recordFail(key);
           throw fail("password errata");
         }

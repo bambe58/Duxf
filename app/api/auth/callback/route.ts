@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { appOrigin, finishAuth, isAllowed } from "@/lib/google";
 import { OAUTH_COOKIE, SESSION_COOKIE, SESSION_MAX_AGE, cookieOptions, readState, signSession } from "@/lib/session";
 import { ensureUser } from "@/lib/users";
+import { db } from "@/lib/db";
+import { signupOpen } from "@/lib/login";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +23,10 @@ export async function GET(req: NextRequest) {
     if (!saved || !code || saved.state !== url.searchParams.get("state")) return back("stato");
     const { email, name } = await finishAuth(origin, code, saved.verifier, saved.nonce);
     if (!isAllowed(email)) return back("non abilitato");
+    if (!signupOpen()) {
+      const known = await db().query("select 1 from users where lower(email) = $1", [email.toLowerCase()]);
+      if (!known.rows.length) return back("registrazioni chiuse");
+    }
     const uid = await ensureUser(email, name);
     const res = NextResponse.redirect(`${origin}/`);
     res.cookies.set(SESSION_COOKIE, await signSession(uid), cookieOptions(SESSION_MAX_AGE));
