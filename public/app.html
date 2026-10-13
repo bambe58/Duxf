@@ -258,6 +258,7 @@ svg text{font-family:inherit}
 .tip{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--ln)}.tip:first-of-type{border-top:0}.tip .ti{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none;font-size:17px;background:var(--bg)}.tip .tt{font-weight:800;font-size:14px}.tip .tx{font-size:13px;color:var(--mu);margin-top:3px;line-height:1.45}.tip .pill{margin-top:8px}
 .tip.tk-up .ti{background:#e5484d1f}.tip.tk-dn .ti{background:#12b5a025}.tip.tk-in .ti{background:#ffb02030}
 html,body{overscroll-behavior-x:none;overflow-x:hidden}
+.btn .gdi{vertical-align:-3px;margin-right:8px}
 @keyframes swf{from{opacity:.55}to{opacity:1}}
 #view.swl,#view.swr{animation:swf .16s ease-out}
 </style></head>
@@ -396,6 +397,14 @@ async function loadAll() {
   skinColors(); YC = {};
 }
 let P = { members: [], invites_in: [], invites_out: [] };
+const GDI = `<svg class="gdi" viewBox="0 0 87.3 78" width="20" height="18" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>`;
+const driveNote = () => {
+  const d = P.drive || {};
+  if (!d.configured) return `<div class="mu" style="margin:8px 0 12px">Google Drive non è ancora attivato per questa app.</div>`;
+  if (!d.linked) return `<div class="mu" style="margin:8px 0 12px">Non collegato: al primo uso ti viene chiesto il permesso.</div>`;
+  const when = d.last ? new Date(d.last).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
+  return `<div class="mu" style="margin:8px 0 12px">Collegato${d.email ? " a " + esc(d.email) : ""} · ${when ? "ultimo backup " + when : "nessun backup ancora"} · <a href="#" data-act="driveoff" style="color:inherit">Scollega</a></div>`;
+};
 let WIPE = null; // sblocco della cancellazione: { token, until }
 const wipeOpen = () => !!(WIPE && Date.now() < WIPE.until);
 // legge nome, tema e nome del conto comune dell'utente collegato
@@ -875,7 +884,7 @@ function sett() {
  <div class="mu" style="margin-top:8px">L'altra persona deve accedere a DuoFin con Google usando questa email e accettare l'invito: da quel momento le due utenze usano gli stessi dati. Ognuna mantiene il proprio aspetto.</div>` : `<div class="mu" style="margin-top:8px">Le due utenze condividono gli stessi dati. Ognuna ha il proprio aspetto.</div>`}
  <label>Il tuo nome</label><div class="row2"><input id="mn" value="${esc(me.name || "")}" maxlength="40"><button class="pill" data-act="myname">Salva</button></div>
  <label>Nome del conto comune</label><div class="row2"><input id="jn" value="${esc(P.joint || "")}"><button class="pill" data-act="jointname">Salva</button></div></div>`;
-  const aspetto = `<div class="card"><h2>Aspetto</h2><div class="mu" style="margin:-4px 0 8px">Vale solo per il tuo account (${esc(me.name || "")}).</div>${SKINS.map(k => `<button class="skin ${k.id === SK ? "on" : ""}" data-act="skin" data-s="${k.id}"><span class="sws">${k.sw.map(c => `<i style="background:${c}"></i>`).join("")}</span><span class="g"><b>${k.n}</b><span class="mu">${k.d}</span></span><span class="chk">${k.id === SK ? "✓" : ""}</span></button>`).join("")}
+  const aspetto = `<div class="card"><h2>Aspetto</h2><div class="mu" style="margin:8px 0 12px">Vale solo per il tuo account (${esc(me.name || "")}).</div>${SKINS.map(k => `<button class="skin ${k.id === SK ? "on" : ""}" data-act="skin" data-s="${k.id}"><span class="sws">${k.sw.map(c => `<i style="background:${c}"></i>`).join("")}</span><span class="g"><b>${k.n}</b><span class="mu">${k.d}</span></span><span class="chk">${k.id === SK ? "✓" : ""}</span></button>`).join("")}
  ${SK !== "classico" ? `<div class="mu" style="margin-top:8px">In questo aspetto i colori delle categorie seguono il tema. Nel Classico tornano quelli che hai scelto tu.</div>` : ""}</div>`;
   return `<div class="view"><div class="card"><h2>Quota mensile ${y}</h2><label>Versamento mensile a testa (€)</label><input id="q" type="number" value="${quotaOf(y) || ""}" inputmode="decimal">
  ${S.quota[y] === undefined && quotaFrom(y) !== null ? `<div class="mu" style="margin-top:6px">Uguale a quella del ${quotaFrom(y)}. Modificala e salva solo se cambia.</div>` : ""}
@@ -888,6 +897,7 @@ function sett() {
  <button class="btn s" data-act="newcat">＋ Nuova categoria</button>
  <div class="mu" style="margin-top:8px">Le categorie archiviate non compaiono nelle nuove spese ma restano nello storico.</div></div>
  <div class="card"><h2>Dati</h2><button class="btn s" style="margin-top:0" data-act="csvall">Esporta tutte le movimentazioni (CSV)</button><button class="btn s" data-act="csv">Esporta solo il ${y} (CSV)</button><button class="btn s" data-act="log">Registro modifiche</button>
+<button class="btn s" data-act="drive">${GDI}Salva backup su Google Drive</button>${driveNote()}
 <button class="btn s" data-act="backup">Backup completo (.json)</button><button class="btn s" data-act="restore">Ripristina da backup</button></div>
  <div class="card"><h2>Dati di prova e azzeramento</h2><button class="btn s" style="margin-top:0" data-act="seeddemo">Inserisci dati di prova</button><div class="mu" style="margin-top:6px">Aggiunge movimenti inventati degli ultimi 5 anni (solo se non ce ne sono già).</div>
  <button class="btn d" data-act="wipe" style="${wipeOpen() ? "" : "opacity:.75"}">⚠️ ${wipeOpen() ? "Cancella tutti i dati" : "Cancella tutti i dati (da attivare)"}</button><div class="mu" style="margin-top:6px">${wipeOpen() ? "Attivato per pochi minuti: premendo il pulsante ti verrà chiesto di scrivere “cancella”." : "Premendo il pulsante ti verrà chiesto di scrivere “attiva” per abilitarlo."} Vengono cancellati solo i dati del tuo nucleo.</div></div>
@@ -1096,7 +1106,7 @@ function download(name, text, mime) {
   const lines = text.replace(/^\ufeff/, "").split("\n"), kb = Math.max(1, Math.round(new Blob([text]).size / 1024));
   const canShare = !!(navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.txt", { type: "text/plain" })] }));
   dlg(`<h2>${esc(name)}</h2><div class="mu">${lines.length.toLocaleString("it-IT")} righe · ${kb} KB</div><textarea id="tx" readonly style="margin-top:8px;min-height:110px">${esc(lines.slice(0, 12).join("\n"))}${lines.length > 12 ? "\n…" : ""}</textarea>
-  <button class="btn" data-act="dlfile">Scarica sul dispositivo</button>${canShare ? `<button class="btn s" data-act="dlshare">Salva su cloud o condividi…</button><div class="mu" style="margin-top:6px">Dal menu scegli Drive, iCloud, OneDrive o un'altra app.</div>` : ""}
+  <button class="btn" data-act="dlfile">Scarica sul dispositivo</button>${/backup/.test(name) ? `<button class="btn s" data-act="drive">${GDI}Salva su Google Drive</button>` : ""}
   <button class="btn s" data-act="close">Chiudi</button>`);
 }
 // salva il file preparato nel dispositivo
@@ -1106,6 +1116,18 @@ function csv(y) {   // y = anno, oppure null per tutte le movimentazioni
   const q = v => '"' + String(v).replace(/"/g, '""') + '"', n = v => v.toFixed(2).replace(".", ",");
   const rows = S.tx.filter(x => y === null || +x.d.slice(0, 4) === y).sort((a, b) => a.d.localeCompare(b.d) || (a.k < b.k ? -1 : 1));
   return "\ufeff" + CSVH + "\n" + rows.map(x => { const s = x.k === "s"; return [x.d, x.d.slice(0, 4), +x.d.slice(5, 7), s ? "uscita" : "entrata", s ? q(cat(x.cat).n) : "", s ? q(subN(x.cat, x.sub)) : "", q(NAMES[x.who]), n(x.a), n(s ? -x.a : x.a), q(x.note)].join(";"); }).join("\n");
+}
+// salva un backup completo nel Google Drive collegato (la prima volta chiede il permesso)
+async function driveBackup(quiet) {
+  const d = P.drive || {};
+  if ($("#dlg").open) $("#dlg").close();
+  if (!d.configured) return dlg(`<h2>${GDI}Google Drive</h2><div class="mu">Il collegamento a Google Drive non è ancora attivato per questa app: manca la configurazione sul server. Nel frattempo puoi usare "Backup completo (.json)" e salvare il file dove vuoi.</div><button class="btn s" data-act="close">Chiudi</button>`);
+  if (!d.linked) return dlg(`<h2>${GDI}Collega Google Drive</h2><div class="mu">Ti verrà chiesto di consentire a DuoFin di salvare i backup nel tuo Drive${P.email ? " (account suggerito: " + esc(P.email) + ")" : ""}. DuoFin vede <b>solo i file che crea lui</b>, in una cartella “DuoFin Backup”: il resto del Drive resta inaccessibile.</div><button class="btn" data-act="drivego">${GDI}Collega Google Drive</button><button class="btn s" data-act="close">Annulla</button>`);
+  toast("Salvataggio su Google Drive…");
+  const { data, error } = await sb.rpc("drive_backup");
+  await loadProfile(); render();
+  if (error) return toast(error.message.charAt(0).toUpperCase() + error.message.slice(1));
+  toast(`Backup salvato su Drive (${data.count} movimenti)`);
 }
 // esporta tutti i dati in un file .json
 async function backup() {
@@ -1262,6 +1284,10 @@ document.addEventListener("click", async e => {
     $("#dlg").close(); await loadProfile(); render(); toast("Password di ripristino salvata");
   }
   else if (a === "dlfile") { saveBlob(DL); toast("File scaricato"); }
+  else if (a === "drive") driveBackup();
+  else if (a === "drivego") { location.href = "/api/drive/start"; }
+  else if (a === "driveoff") { e.preventDefault(); dlg(`<h2>Scollegare Google Drive?</h2><div class="mu">I backup già salvati restano nel tuo Drive. Potrai ricollegarlo quando vuoi.</div><button class="btn d" data-act="driveoffgo">Scollega</button><button class="btn s" data-act="close">Annulla</button>`); }
+  else if (a === "driveoffgo") { $("#dlg").close(); await sb.rpc("drive_unlink"); await loadProfile(); render(); toast("Google Drive scollegato"); }
   else if (a === "dlshare") { try { await navigator.share({ files: [new File([DL.text], DL.name, { type: DL.mime })], title: DL.name }); } catch (_) { } }
   else if (a === "newcat") { pick = PAL0[0]; pickI = "casa"; dlg(`<h2>Nuova categoria</h2><label>Nome</label><input id="nc"><label>Icona</label>${icoGrid("casa")}<label>Colore</label>
   <div class="sw" id="sw">${PAL0.map((c, i) => `<i data-act="pick" data-c="${c}" class="${i === 0 ? "on" : ""}" style="background:${c}"></i>`).join("")}</div>
@@ -1389,6 +1415,10 @@ async function start() {
   if (qs.get("error_description")) { history.replaceState(null, "", location.pathname); showLogin(); $("#lerr").textContent = "Accesso con Google non riuscito."; return; }
   const { data: { session } } = await sb.auth.getSession();
   $("#lgoogle").style.display = sb.google ? "" : "none";
-  if (session) start(); else showLogin();
+  if (session) {
+    await start();
+    const dq = qs.get("drive");
+    if (dq) { history.replaceState(null, "", location.pathname); if (dq === "ok") { toast("Google Drive collegato"); await loadProfile(); await driveBackup(); } else toast(dq); }
+  } else showLogin();
 })();
 </script></body></html>

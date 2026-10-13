@@ -40,3 +40,8 @@ isolamento tra nuclei, regole sui movimenti, registro modifiche, ricorrenze, inv
 ## Registrazioni e cancellazione totale
 - Le registrazioni sono **chiuse** (anche per i nuovi accessi con Google). Per riaprirle imposta `SIGNUP_OPEN=1`.
 - "Cancella tutti i dati" richiede due passaggi: scrivere `attiva` (abilita il pulsante per 10 minuti) e poi `cancella`. Non sono password segrete, ma una protezione contro i tocchi accidentali; il server richiede comunque i due passaggi in ordine. Cancella solo i dati del nucleo di chi la esegue.
+
+## Backup su Google Drive
+Il pulsante "Salva backup su Google Drive" (Impostazioni › Dati) salva un file `.json` (stesso formato del backup scaricabile, ripristinabile da "Ripristina da backup") nella cartella "DuoFin Backup" del Drive di chi lo collega e tiene gli ultimi 30.
+- Permesso richiesto: solo `drive.file` (l'app vede esclusivamente i file che crea lei). Il token di aggiornamento è salvato **cifrato** (AES-256-GCM, chiave derivata da `AUTH_SECRET`) nella tabella `drive_links`; migrazione `migrations/003_drive.sql`.
+- Serve un client OAuth Google ("Applicazione web") con l'API Google Drive abilitata e come URI di reindirizzamento `https://<tuo-dominio>/api/drive/callback`; le sue credenziali vanno in `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`. Se mancano, il pulsante spiega che Drive non è attivato.

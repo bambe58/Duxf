@@ -7,7 +7,7 @@ import { loadCtx, type Ctx } from "../lib/session";
 /** Database Postgres vero ma in memoria (PGlite), con lo stesso schema di Neon. */
 export async function freshDb() {
   const pg = new PGlite({ parsers: { 20: (v: string) => Number(v), 1082: (v: string) => v } });
-  for (const f of ["001_schema.sql", "002_password_login.sql"]) await pg.exec(readFileSync(new URL("../migrations/" + f, import.meta.url), "utf8"));
+  for (const f of ["001_schema.sql", "002_password_login.sql", "003_drive.sql"]) await pg.exec(readFileSync(new URL("../migrations/" + f, import.meta.url), "utf8"));
   setDb({
     query: async (sql, params) => {
       const r = await pg.query(sql, params as any[]);

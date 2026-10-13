@@ -7,6 +7,7 @@ import { SKINS, UUID, cleanName, cleanPayload, normPayer } from "./validate";
 import { readState, signState, type Ctx } from "./session";
 import { clearFails, recordFail, tooMany } from "./login";
 import { seedDemo, wipeAll } from "./demo";
+import { backupToDrive, driveStatus, unlinkDrive } from "./drive";
 
 type Row = Record<string, any>;
 const fail = (m: string, status = 400) => new HttpError(status, m);
@@ -38,6 +39,7 @@ async function getProfile(ctx: Ctx) {
     members: mem.rows,
     invites_in: inIn.rows,
     invites_out: out.rows,
+    drive: await driveStatus(ctx.uid),
   };
 }
 
@@ -231,6 +233,13 @@ export async function handleRpc(ctx: Ctx, n: string, a: Row) {
         await db().tx((q) => wipeAll(q, ctx));
         return { error: null };
       }
+      case "drive_status":
+        return { data: await driveStatus(ctx.uid), error: null };
+      case "drive_backup":
+        return { data: await backupToDrive(ctx), error: null };
+      case "drive_unlink":
+        await unlinkDrive(ctx.uid);
+        return { error: null };
       case "restore_backup":
         await restoreBackup(ctx, a);
         return { error: null };
