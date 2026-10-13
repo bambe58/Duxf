@@ -262,9 +262,11 @@ test("dati di prova e cancellazione con doppia password", async () => {
   process.env.WIPE_UNLOCK_HASH = hashPassword("sblocco1");
   process.env.WIPE_CONFIRM_HASH = hashPassword("conferma1");
   const n = ((await handleRpc(s.a, "seed_demo", {})) as any).data;
-  assert.ok(n > 40);
+  assert.ok(n > 600);
   const txs = await sel(s.a, "transactions");
   assert.equal(txs.length, n);
+  const yrs = new Set(txs.map((t: any) => t.tx_date.slice(0, 4)));
+  assert.ok(yrs.size >= 5, "almeno cinque anni di storico");
   assert.ok(txs.every((t: any) => t.tx_date <= new Date().toISOString().slice(0, 10)));
   await rejects(handleRpc(s.a, "seed_demo", {}), 400); // già pieno
   // l'altro nucleo non vede nulla
