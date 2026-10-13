@@ -257,9 +257,9 @@ svg text{font-family:inherit}
 .tipbtn{border:0;display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer;color:inherit;font:inherit}.tipbtn .ti{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:var(--bg);font-size:17px}.tipbtn .g{display:flex;flex-direction:column;flex:1}
 .tip{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--ln)}.tip:first-of-type{border-top:0}.tip .ti{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none;font-size:17px;background:var(--bg)}.tip .tt{font-weight:800;font-size:14px}.tip .tx{font-size:13px;color:var(--mu);margin-top:3px;line-height:1.45}.tip .pill{margin-top:8px}
 .tip.tk-up .ti{background:#e5484d1f}.tip.tk-dn .ti{background:#12b5a025}.tip.tk-in .ti{background:#ffb02030}
-html,body{overscroll-behavior-x:none}
-@keyframes swl{from{opacity:.4;transform:translateX(36px)}to{opacity:1;transform:none}}@keyframes swr{from{opacity:.4;transform:translateX(-36px)}to{opacity:1;transform:none}}
-#view.swl{animation:swl .22s ease-out}#view.swr{animation:swr .22s ease-out}
+html,body{overscroll-behavior-x:none;overflow-x:hidden}
+@keyframes swf{from{opacity:.55}to{opacity:1}}
+#view.swl,#view.swr{animation:swf .16s ease-out}
 </style></head>
 <body><div class="top"><div class="brand"><svg class="logo" viewBox="0 0 64 64" width="26" height="26" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#c8553d"/><circle cx="25" cy="32" r="14" fill="#fff" opacity=".95"/><circle cx="39" cy="32" r="14" fill="#ffd9cc" opacity=".9"/><path d="M32 22a14 14 0 010 20 14 14 0 010-20z" fill="#c8553d"/></svg><span>DuoFin</span></div><div class="yrs" id="yrs"></div></div>
 <div id="view"></div>
@@ -1326,7 +1326,8 @@ document.addEventListener("touchstart", e => {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) return;      // campi e cursori
     if (el.scrollWidth > el.clientWidth + 1 && /(auto|scroll)/.test(getComputedStyle(el).overflowX)) return; // contenuti già scorrevoli di lato
   }
-  const t = e.touches[0]; SW = { x: t.clientX, y: t.clientY, t: Date.now() };
+  const t = e.touches[0]; if (t.clientX < 24 || t.clientX > innerWidth - 24) return; // i bordi sono dei gesti di sistema (indietro)
+  SW = { x: t.clientX, y: t.clientY, t: Date.now() };
 }, { passive: true });
 document.addEventListener("touchend", e => {
   const s = SW; SW = null; if (!s || !e.changedTouches.length) return;
