@@ -1113,6 +1113,8 @@ function download(name, text, mime) {
 }
 // salva il file preparato nel dispositivo
 function saveBlob(d) { const u = URL.createObjectURL(new Blob([d.text], { type: d.mime })), a = document.createElement("a"); a.href = u; a.download = d.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
+// scarica subito il file, senza anteprima ne' finestra
+function exportNow(name, text, mime) { saveBlob({ name, text, mime }); toast("File scaricato"); }
 const CSVH = "data;anno;mese;tipo;categoria;sottocategoria;pagante;importo;importo_con_segno;nota";
 function csv(y) {   // y = anno, oppure null per tutte le movimentazioni
   const q = v => '"' + String(v).replace(/"/g, '""') + '"', n = v => v.toFixed(2).replace(".", ",");
@@ -1123,8 +1125,8 @@ function csv(y) {   // y = anno, oppure null per tutte le movimentazioni
 async function driveBackup(quiet) {
   const d = P.drive || {};
   if ($("#dlg").open) $("#dlg").close();
-  if (!d.configured) return dlg(`<h2>${GDI}Google Drive</h2><div class="mu">Il collegamento a Google Drive non è ancora attivato per questa app: manca la configurazione sul server. Nel frattempo puoi usare "Backup completo (.json)" e salvare il file dove vuoi.</div><button class="btn s" data-act="close">Chiudi</button>`);
-  if (!d.linked) return dlg(`<h2>${GDI}Collega Google Drive</h2><div class="mu">Ti verrà chiesto di consentire a DuoFin di salvare i backup nel tuo Drive${P.email ? " (account suggerito: " + esc(P.email) + ")" : ""}. DuoFin vede <b>solo i file che crea lui</b>, in una cartella “DuoFin Backup”: il resto del Drive resta inaccessibile.</div><button class="btn" data-act="drivego">${GDI}Collega Google Drive</button><button class="btn s" data-act="close">Annulla</button>`);
+  if (!d.configured) return dlg(`<h2>${GDI}Google Drive</h2><div class="mu">Il collegamento a Google Drive non è ancora attivato per questa app: sul server mancano le credenziali Google (variabili GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET su Vercel, vedi README). Nel frattempo puoi usare "Backup completo (.json)" e salvare il file dove vuoi.</div><button class="btn s" data-act="close">Chiudi</button>`);
+  if (!d.linked) { location.href = "/api/drive/start"; return; }   // il consenso (e cosa vede DuoFin) lo mostra Google stessa
   toast("Salvataggio su Google Drive…");
   const { data, error } = await sb.rpc("drive_backup");
   await loadProfile(); render();
@@ -1286,7 +1288,7 @@ document.addEventListener("click", async e => {
     if (error) return m(error.message.includes("attuale") ? "La password attuale non è corretta." : "Errore: " + error.message);
     $("#dlg").close(); await loadProfile(); render(); toast("Password di ripristino salvata");
   }
-  else if (a === "dlfile") { saveBlob(DL); toast("File scaricato"); }
+  else if (a === "dlfile") { saveBlob(DL); $("#dlg").close(); toast("File scaricato"); }
   else if (a === "drive") driveBackup();
   else if (a === "drivego") { location.href = "/api/drive/start"; }
   else if (a === "driveoff") { e.preventDefault(); dlg(`<h2>Scollegare Google Drive?</h2><div class="mu">I backup già salvati restano nel tuo Drive. Potrai ricollegarlo quando vuoi.</div><button class="btn d" data-act="driveoffgo">Scollega</button><button class="btn s" data-act="close">Annulla</button>`); }
@@ -1301,8 +1303,8 @@ document.addEventListener("click", async e => {
   }
   else if (a === "log") loadLog(false);
   else if (a === "logmore") loadLog(true);
-  else if (a === "csv") download("duofin-movimenti-" + S.year + ".csv", csv(S.year), "text/csv;charset=utf-8");
-  else if (a === "csvall") download("duofin-movimenti-completi-" + new Date().toISOString().slice(0, 10) + ".csv", csv(null), "text/csv;charset=utf-8");
+  else if (a === "csv") exportNow("duofin-movimenti-" + S.year + ".csv", csv(S.year), "text/csv;charset=utf-8");
+  else if (a === "csvall") exportNow("duofin-movimenti-completi-" + new Date().toISOString().slice(0, 10) + ".csv", csv(null), "text/csv;charset=utf-8");
   else if (a === "backup") { try { await backup(); toast("Backup scaricato"); } catch (er) { toast("Errore: " + er.message); } }
   else if (a === "restore") dlg(`<h2>Ripristina backup</h2><label>File di backup (.json)</label><input id="rf" type="file" accept=".json,application/json"><label>Password di ripristino</label><input id="rp" type="password" autocomplete="off">
   <div class="mu" id="rm" style="margin-top:8px">${P.has_pw ? "Il ripristino sostituisce tutti i dati attuali." : "Prima imposta la password di ripristino in Impostazioni › Sicurezza."}</div><button class="btn d" data-act="dorestore">Ripristina</button><button class="btn s" data-act="close">Annulla</button>`);
