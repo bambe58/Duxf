@@ -487,8 +487,9 @@ function Y(y, cin) {
   const Q = quotaOf(y), integr = Math.max(0, proj / 2 - 12 * Q), c = { P1: vs.P1 + pk.P1, P2: vs.P2 + pk.P2 };
   const dov = {}, cred = {};
   ["P1", "P2"].forEach(p => {
+    const sf = Math.max(0, Q * cd - c[p]); // conguaglio per portare chi e' sotto alla quota minima
     const ex = Math.max(0, c[p] - Q * cd) + cin[p];
-    dov[p] = Math.max(0, integr - ex); cred[p] = Math.max(0, ex - integr);
+    dov[p] = sf + Math.max(0, integr - ex); cred[p] = Math.max(0, ex - integr);
   });
   const ent = c.P1 + c.P2 + cin.P1 + cin.P2 + 2 * Q * (12 - cd); // entrate stimate a fine anno: versato finora + quota sui mesi rimanenti
   return { y, spent, pk, vs, c, spM, vrM, proj, Q, integr, dov, cred, cin, ent, delta: ent - proj, rec: Q + integr / 12, saldo: vs.P1 + vs.P2 - jt, open, cd, credNext: cred };
@@ -535,28 +536,29 @@ function actions() {
 function home() {
   const d = YD(S.year), C = 2 * Math.PI * 74, cov = p => Math.min(d.c[p] / (d.proj || 1), .5) * C;
   const recent = S.tx.filter(x => +x.d.slice(0, 4) === S.year).sort((a, b) => b.d.localeCompare(a.d)).slice(0, 4);
-  const f1 = n => n.toFixed(1).replace(".", ","), tot = d.proj / 2 || 1;
-  const cvr = p => { const m = d.Q ? d.c[p] / d.Q : 0, pct = d.Q ? Math.min(100, Math.round(d.c[p] / (12 * d.Q) * 100)) : 0;
-    return `<div class="prow"><div class="h"><span><span class="dot" style="background:${COL[p]}"></span>${NAMES[p]}</span><span><b>${f1(m)}</b> mesi</span></div>
+  const f1 = n => n.toFixed(1).replace(".", ","), tot = (12 * d.Q + d.integr) || 1;   // obiettivo a testa = max(quota minima annua, meta' delle spese)
+  const cvr = p => { const m = d.Q ? d.c[p] / d.Q : 0, pct = d.Q ? Math.min(100, Math.round(d.c[p] / tot * 100)) : 0;
+    return `<div class="prow"><div class="h"><span><span class="dot" style="background:${COL[p]}"></span>${NAMES[p]}</span><span><b>${f1(m)}</b> quote</span></div>
   <div class="mlab">${MESI.map(x => `<span>${x}</span>`).join("")}</div>
   <div class="mtrk"><i class="f" data-w="${Math.min(m, 12) / 12 * 100}" style="background:${COL[p]}"></i><b class="tick" style="left:${d.cd / 12 * 100}%"></b></div>
-  <div class="mu" style="margin-top:6px">${eur(d.c[p])} / ${eur(tot)}, ${pct}% dei mesi coperti${d.cin[p] >= 1 ? ` · credito dall'anno prima ${eur(d.cin[p])}` : ""}</div></div>`; };
-  const cong = d.dov.P1 + d.dov.P2, dl = d.delta, sg = dl >= 1 ? "+" : dl <= -1 ? "−" : "";
+  <div class="mu" style="margin-top:6px">${eur(d.c[p])} / ${eur(tot)}, ${pct}% delle quote coperte${d.cin[p] >= 1 ? ` · credito dall'anno prima ${eur(d.cin[p])}` : ""}</div></div>`; };
+  const cong = d.dov.P1 + d.dov.P2, dl = d.delta, ovr = d.ent - 2 * tot, /* quanto le entrate superano l'obiettivo dei due utenti: e' la parte che passa all'anno dopo */ sg = dl >= 1 ? "+" : dl <= -1 ? "−" : "";
   const done = S.year === CY ? CM : 0, cr = ["P1", "P2"].reduce((t, p) => t + (d.cred[p] >= 1 ? d.cred[p] : 0), 0); // ignora arrotondamenti sotto 1 €
-  const ttl = d.open ? (done >= 1 ? `Delta (stima ${MESI_L[done - 1]})` : "Delta (stima)") : "Delta definitivo", crl = d.open ? "Credito (stimato)" : "Credito definitivo";
+  const ttl = d.open ? (done >= 1 ? `Delta (stima ${MESI_L[done - 1]})` : "Delta (stima)") : "Delta definitivo", crl = d.open ? "Credito totale (stimato)" : "Credito totale", cgl = d.open ? "Conguaglio totale (stimato)" : "Conguaglio totale";
+  const tbl = o => `<div style="display:grid;grid-template-columns:auto auto;justify-content:start;column-gap:14px">${["P1", "P2"].map(p => `<span>${NAMES[p]}</span><span style="text-align:right">${eur(o[p])}</span>`).join("")}</div>`;   // nomi allineati tra loro, importi allineati a destra
   const cover = d.Q ? `<div class="card"><h2>Copertura della quota</h2>${cvr("P1")}${cvr("P2")}<div class="mu">La linea nera è il punto in cui dovreste essere oggi.</div></div>
  <div class="card"><h2>Riepilogo ${S.year}</h2><div class="two" style="row-gap:16px">
- <div><div class="mu">${ttl}</div><div class="big" style="color:${dl <= -1 ? "#e5484d" : "var(--J)"}">${sg}${eur(Math.abs(dl))}</div></div>
- <div><div class="mu">Conguaglio</div><div class="big">${eur(cong)}</div><div class="mu">${cong >= 1 ? `${NAMES.P1} ${eur(d.dov.P1)} · ${NAMES.P2} ${eur(d.dov.P2)}` : "nessun versamento extra"}</div></div>
- <div><div class="mu">${crl}</div><div class="big">${eur(cr)}</div><div class="mu">${cr >= 1 ? ["P1", "P2"].filter(p => d.cred[p] >= 1).map(p => `${NAMES[p]} ${eur(d.cred[p])}`).join(" · ") : "nessun credito"}</div></div>
- <div><div class="mu">Rata consigliata</div><div class="big">${eur(d.rec)}</div><div class="mu">al mese a testa</div></div></div></div>`
+ <div><div class="mu">${ttl}</div><div class="big" style="color:${dl <= -1 ? "#e5484d" : "var(--J)"}">${sg}${eur(Math.abs(dl))}</div>${ovr >= 1 ? `<div class="mu">${eur(ovr)} oltre l'obiettivo</div>` : ""}</div>
+ <div><div class="mu">${cgl}</div><div class="big">${eur(cong)}</div><div class="mu">${cong >= 1 ? tbl(d.dov) : "nessun versamento extra"}</div></div>
+ <div><div class="mu">${crl}</div><div class="big">${eur(cr)}</div><div class="mu">${cr >= 1 ? tbl(d.cred) : "nessun credito"}</div></div>
+ <div><div class="mu">Nuova quota stimata</div><div class="big">${eur(d.rec)}</div><div class="mu">${d.rec - d.Q < .5 ? "in budget" : `+ ${eur(d.rec - d.Q)} / mese`}</div></div></div></div>`
     : `<div class="card"><h2>Copertura della quota</h2><div class="empty">Imposta la quota mensile ${S.year} in Impostazioni per vedere copertura e conguaglio.</div></div>`;
   return `<div class="view"><button class="card tipbtn" data-act="tips"><span class="ti">💡</span><span class="g"><b>Suggerimenti</b><span class="mu">Quattro spunti dai vostri dati</span></span><span class="mu">›</span></button><div class="hero"><svg class="ring" viewBox="0 0 180 180"><circle class="trk" cx="90" cy="90" r="74"/>
  <circle class="arc" cx="90" cy="90" r="74" stroke="var(--F)" stroke-dasharray="0 ${C}" data-d="${cov("P1")} ${C}"/>
  <circle class="arc" cx="90" cy="90" r="74" stroke="var(--M)" stroke-dasharray="0 ${C}" stroke-dashoffset="${-cov("P1")}" data-d="${cov("P2")} ${C}"/></svg>
- <div class="mid"><div class="mu">quota consigliata</div><div class="num" id="rec">0</div><div class="mu">€ al mese a testa</div></div></div>
+ <div class="mid"><div class="mu">quota fissata</div><div class="num" id="rec">0</div><div class="mu">€ al mese a testa</div></div></div>
  <div class="chips"><div class="chip"><span class="mu">Spese</span><b>${eur(d.spent)}</b></div><div class="chip"><span class="mu">Versato</span><b>${eur(d.vs.P1 + d.vs.P2)}</b></div>
- <div class="chip"><span class="mu"><span class="dot" style="background:var(--J)"></span>${NAMES.J}</span><b style="color:${d.saldo < 0 ? "#e5484d" : "var(--J)"}">${eur(d.saldo)}</b></div></div>
+ <div class="chip"><span class="mu">Delta</span><b style="color:${d.saldo < 0 ? "#e5484d" : "var(--J)"}">${eur(d.saldo)}</b></div></div>
  ${cover}
  <div class="card"><h2>Ultimi Movimenti</h2>${recent.map(row).join("") || `<div class="empty">Ancora nessun movimento.<br>Premi + per aggiungere il primo.</div>`}</div>
  ${actions()}</div>`;
@@ -926,8 +928,8 @@ function render() {
     document.querySelectorAll(".arc").forEach(e => e.setAttribute("stroke-dasharray", e.dataset.d));
   };
   if (still) {   // stessa schermata: valori subito al loro posto, senza ripartire da zero
-    const v = $("#view"); v.classList.add("nt"); fill(); if ($("#rec")) $("#rec").textContent = Math.round(YD(S.year).rec).toLocaleString("it-IT"); void v.offsetWidth; v.classList.remove("nt");
-  } else requestAnimationFrame(() => requestAnimationFrame(() => { fill(); if ($("#rec")) count($("#rec"), YD(S.year).rec); }));
+    const v = $("#view"); v.classList.add("nt"); fill(); if ($("#rec")) $("#rec").textContent = Math.round(YD(S.year).Q).toLocaleString("it-IT"); void v.offsetWidth; v.classList.remove("nt");
+  } else requestAnimationFrame(() => requestAnimationFrame(() => { fill(); if ($("#rec")) count($("#rec"), YD(S.year).Q); }));
 }
 
 /* ---------------- form movimento ---------------- */
@@ -1173,7 +1175,7 @@ function bioLock() { if (localStorage.getItem("casa.bio")) { $("#bio").classList
 let hiddenAt = 0;
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) hiddenAt = Date.now();
-  else { if (hiddenAt && Date.now() - hiddenAt > 60000) bioLock(); refresh(); }
+  else { if (hiddenAt && Date.now() - hiddenAt > 60000) bioLock(); refresh(); setTimeout(cgCheck, 800); }
 });
 
 /* ---------------- azioni ---------------- */
@@ -1239,6 +1241,7 @@ document.addEventListener("click", async e => {
   else if (a === "edit") openForm(id);
   else if (a === "seg") { ED[b.dataset.key] = b.dataset.v; drawForm(); }
   else if (a === "close") { $("#dlg").close(); armed = false; }
+  else if (a === "cgok") { try { localStorage.setItem(cgKey(CGOPEN), "1"); } catch (_) { } CGOPEN = null; $("#dlg").close(); }
   else if (a === "save") {
     const v = parseFloat($("#fa").value); if (!(v > 0)) { $("#fa").focus(); return; }
     const p = { kind: ED.k === "s" ? "spesa" : "versamento", amount_cents: Math.round(v * 100), tx_date: $("#fd").value, payer: ED.who, note: $("#fn").value.trim(),
@@ -1365,7 +1368,23 @@ document.addEventListener("touchend", e => {
   const v = $("#view"); v.classList.remove("swl", "swr"); void v.offsetWidth; v.classList.add(dx < 0 ? "swl" : "swr");
 }, { passive: true });
 document.addEventListener("click", e => { if (ST.ydd && !e.target.closest(".ddw")) { ST.ydd = false; S.still = true; render(); } });
-$("#dlg").addEventListener("click", e => { if (e.target === $("#dlg")) $("#dlg").close(); });
+$("#dlg").addEventListener("click", e => { if (e.target === $("#dlg") && !CGOPEN) $("#dlg").close(); });
+$("#dlg").addEventListener("cancel", e => { if (CGOPEN) e.preventDefault(); });   // il popup di conguaglio si chiude solo con OK
+
+// dal 1 gennaio, se l'anno chiuso ha un conguaglio positivo, chiede di fare il versamento e di premere OK (finche' non si preme, riappare)
+let CGOPEN = null;
+const cgKey = y => "duofin.cgok." + y + "." + (P.id || "");
+function cgCheck() {
+  const y = CY - 1;
+  if (!S.tx.length || $("#dlg").open || CGOPEN !== null || $("#login").classList.contains("on") || $("#bio").classList.contains("on")) return;
+  try { if (localStorage.getItem(cgKey(y))) return; } catch (_) { }
+  const d = YD(y);
+  if (!d.Q || d.open || d.dov.P1 + d.dov.P2 < 1) return;
+  const mine = P.members && P.members[0] && P.members[0].id === P.id ? "P1" : "P2";
+  const rows = ["P1", "P2"].filter(p => d.dov[p] >= 1).map(p => `<div class="rr"><span><span class="dot" style="background:${COL[p]}"></span>${esc(NAMES[p])}${p === mine ? " (tu)" : ""}</span><b>${eur(d.dov[p])}</b></div>`).join("");
+  CGOPEN = y;
+  dlg(`<h2>Conguaglio ${y}</h2><div class="mu">Con la chiusura del ${y} serve un versamento di conguaglio nel conto comune.</div><div class="sbox ro">${rows}</div><div class="mu" style="margin-top:8px">Effettua il versamento, poi premi OK.</div><button class="btn" data-act="cgok">OK</button>`);
+}
 
 /* ---------------- accesso e avvio ---------------- */
 // mostra la schermata di login e svuota la vista
@@ -1405,7 +1424,7 @@ async function start() {
   try {
     const { data: ok } = await sb.rpc("is_member");
     if (!ok) { await sb.auth.signOut(); showLogin(); $("#lerr").textContent = "Account non abilitato."; return; }
-    await loadProfile(); await loadAll(); render(); subscribe(); bioLock(); runRecurrences();
+    await loadProfile(); await loadAll(); render(); subscribe(); bioLock(); runRecurrences(); setTimeout(cgCheck, 700);
     if (P.invites_in.length) { const i = P.invites_in[0]; setTimeout(() => { dlg(`<h2>Invito</h2><div class="mu"><b>${esc(i.from_name)}</b> (${esc(i.from_email)}) ti invita a condividere i conti su DuoFin.</div><button class="btn" data-act="ansinv" data-id="${i.id}" data-v="1">Accetta</button><button class="btn s" data-act="ansinv" data-id="${i.id}" data-v="0">Rifiuta</button><button class="btn s" data-act="close">Decido dopo</button>`); }, 400); }
   } catch (e) { toast("Impossibile caricare i dati: " + (e.message || e)); }
 }
