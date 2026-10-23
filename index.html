@@ -263,14 +263,13 @@ svg text{font-family:inherit}
 <div class="lock" id="login">
   <div class="lgo"><svg class="logo" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#c8553d"/><circle cx="25" cy="32" r="14" fill="#fff" opacity=".95"/><circle cx="39" cy="32" r="14" fill="#ffd9cc" opacity=".9"/><path d="M32 22a14 14 0 010 20 14 14 0 010-20z" fill="#c8553d"/></svg></div><div style="font-weight:800;font-size:26px;letter-spacing:-.02em">DuoFin</div>
   <div style="font-size:13px;opacity:.9;margin-top:-6px">Il bilancio di casa, in due</div>
-  <div class="lmode"><button class="on" data-act="lmode" data-m="in" id="lm-in">Accedi</button><button data-act="lmode" data-m="up" id="lm-up">Crea account</button></div>
+  <div class="lmode"><button class="on" data-act="lmode" data-m="in" id="lm-in">Accedi</button><button data-act="lmode" data-m="up" id="lm-up">Primo accesso</button></div>
   <input id="ln" type="text" placeholder="Il tuo nome" autocomplete="given-name" style="display:none">
   <input id="em" type="email" placeholder="Email" autocomplete="username">
   <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
   <div class="err" id="lerr"></div>
   <button data-act="login" id="lgo">Accedi</button>
-  <div style="font-size:12px;opacity:.85">oppure</div>
-  <button data-act="google" class="gbtn">Continua con Google</button>
+  <div id="lhint" style="font-size:12px;opacity:.85;display:none;max-width:280px;text-align:center">Solo per chi è stato abilitato o invitato: scegli la tua password.</div>
 </div>
 
 <div class="lock" id="bio">
@@ -1321,7 +1320,7 @@ let MODE = "in";
 // alterna accesso e registrazione nella schermata di login
 function setMode(m) {
   MODE = m; $("#lm-in").classList.toggle("on", m === "in"); $("#lm-up").classList.toggle("on", m === "up");
-  $("#ln").style.display = m === "up" ? "" : "none"; $("#lgo").textContent = m === "up" ? "Crea account" : "Accedi";
+  $("#ln").style.display = m === "up" ? "" : "none"; $("#lgo").textContent = m === "up" ? "Imposta password e accedi" : "Accedi"; $("#lhint").style.display = m === "up" ? "" : "none";
   $("#pw").autocomplete = m === "up" ? "new-password" : "current-password"; $("#lerr").textContent = "";
 }
 // mostra la schermata di login e svuota la vista
@@ -1343,7 +1342,7 @@ async function signup() {
   const name = $("#ln").value.trim(), email = $("#em").value.trim(), pw = $("#pw").value, e = t => { $("#lerr").textContent = t; };
   if (!name) return e("Scrivi il tuo nome."); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return e("Email non valida."); if (pw.length < 6) return e("La password deve avere almeno 6 caratteri.");
   const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { name }, emailRedirectTo: location.origin + location.pathname } });
-  if (error) return e(/abilitat/i.test(error.message) ? "Questo indirizzo non è abilitato." : /registered|già/i.test(error.message) ? "Questa email è già registrata." : "Registrazione non riuscita.");
+  if (error) return e(/abilitat/i.test(error.message) ? "Questa email non è abilitata: chiedi l'accesso a chi gestisce DuoFin." : /registered|già/i.test(error.message) ? "Questa email è già registrata." : "Registrazione non riuscita.");
   $("#pw").value = ""; $("#ln").value = "";
   if (!data.session) return e("Ti abbiamo scritto: apri il link nella mail per confermare, poi accedi.");   // conferma email attiva
   $("#login").classList.remove("on"); start();
