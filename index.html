@@ -397,6 +397,10 @@ async function loadProfile() {
   P = data; const m = P.members;
   NAMES.F = m[0] ? m[0].name : "Tu"; NAMES.M = m[1] ? m[1].name : "Partner"; NAMES.J = P.joint || "Conto comune";
   if (P.skin && P.skin !== SK) applySkin(P.skin, false);
+  // l'amministratore vede e gestisce le email abilitate (se le funzioni non sono ancora nel database resta tutto nascosto)
+  P.admin = false; P.allowed = [];
+  const ad = await sb.rpc("is_admin");
+  if (!ad.error && ad.data) { P.admin = true; const l = await sb.rpc("admin_allowed_list"); P.allowed = l.data || []; }
 }
 // esegue una scrittura, poi ricarica profilo e dati e ridisegna; in caso di errore lo mostra
 async function run(fn, ok) {
@@ -865,12 +869,16 @@ function sett() {
  ${P.invites_out.map(i => `<div class="mem"><span class="g mu">In attesa: ${esc(i.to)}</span><button class="pill" data-act="cancelinv" data-id="${i.id}">Annulla</button></div>`).join("")}
  <div class="mu" style="margin-top:8px">Quando l'altra persona accetta l'invito, le due utenze usano gli stessi dati. Ognuna mantiene il proprio aspetto.</div>` : `<div class="mu" style="margin-top:8px">Le due utenze condividono gli stessi dati. Ognuna ha il proprio aspetto.</div>`}
  <label>Nome del conto comune</label><div class="row2"><input id="jn" value="${esc(P.joint || "")}"><button class="pill" data-act="jointname">Salva</button></div></div>`;
+  // solo amministratore: chi puo' fare il primo accesso (le email invitate dagli utenti si aggiungono da sole)
+  const abilitati = P.admin ? `<div class="card"><h2>Utenti abilitati</h2><div class="mu" style="margin:-4px 0 8px">Solo queste email possono fare il primo accesso. Chi viene invitato da un utente è abilitato in automatico.</div>
+ ${P.allowed.map(u => `<div class="mem"><span class="g"><b>${esc(u.email)}</b><div class="mu">${u.is_admin ? "amministratore" : u.registered ? "registrato" : "in attesa del primo accesso"}</div></span>${u.is_admin || u.registered ? "" : `<button class="pill" data-act="allowdel" data-e="${esc(u.email)}">Togli</button>`}</div>`).join("")}
+ <label>Abilita una nuova email</label><div class="row2"><input id="ae" type="email" placeholder="nome@email.it" autocomplete="off"><button class="pill on" data-act="allowadd">Abilita</button></div></div>` : "";
   const aspetto = `<div class="card"><h2>Aspetto</h2><div class="mu" style="margin:-4px 0 8px">Vale solo per il tuo account (${esc(me.name || "")}).</div>${SKINS.map(k => `<button class="skin ${k.id === SK ? "on" : ""}" data-act="skin" data-s="${k.id}"><span class="sws">${k.sw.map(c => `<i style="background:${c}"></i>`).join("")}</span><span class="g"><b>${k.n}</b><span class="mu">${k.d}</span></span><span class="chk">${k.id === SK ? "✓" : ""}</span></button>`).join("")}
  ${SK !== "classico" ? `<div class="mu" style="margin-top:8px">In questo aspetto i colori delle categorie seguono il tema. Nel Classico tornano quelli che hai scelto tu.</div>` : ""}</div>`;
   return `<div class="view"><div class="card"><h2>Quota mensile ${y}</h2><label>Versamento mensile a testa (€)</label><input id="q" type="number" value="${quotaOf(y) || ""}" inputmode="decimal">
  ${S.quota[y] === undefined && quotaFrom(y) !== null ? `<div class="mu" style="margin-top:6px">Uguale a quella del ${quotaFrom(y)}. Modificala e salva solo se cambia.</div>` : ""}
  <button class="btn" data-act="saveq">Salva quota</button></div>
- ${aspetto}${famiglia}${ricorrenze}<div class="card"><h2>Categorie</h2>${S.cats.map(c => { const o = S.openCat === c.id, n = c.subs.filter(x => !x.arch).length;
+ ${aspetto}${famiglia}${abilitati}${ricorrenze}<div class="card"><h2>Categorie</h2>${S.cats.map(c => { const o = S.openCat === c.id, n = c.subs.filter(x => !x.arch).length;
  return `<div class="cr ${c.arch ? "arch" : ""}"><button class="crh" data-act="opencat" data-id="${c.id}"><span class="ic" style="--cc:${c.c}">${ico(c.i)}</span><span class="g"><b>${esc(c.n)}</b><span class="mu"> · ${n} sottocategori${n === 1 ? "a" : "e"}${c.arch ? " · archiviata" : ""}</span></span><span class="chev">${o ? "▾" : "▸"}</span></button>
  ${o ? `<div class="crb"><div style="display:flex;gap:6px"><input data-ren="cat:${c.id}" value="${esc(c.n)}"><button class="pill" data-act="chicon" data-id="${c.id}">Icona</button><button class="pill" data-act="archcat" data-id="${c.id}">${c.arch ? "Ripristina" : "Archivia"}</button></div>
  <div style="margin-top:8px">${c.subs.map(x => `<span class="sub ${x.arch ? "arch" : ""}"><span data-act="rensub" data-id="${x.id}" style="cursor:pointer">${esc(x.n)}</span><button data-act="archsub" data-id="${x.id}" aria-label="${x.arch ? "Ripristina" : "Archivia"}">${x.arch ? "↺" : "✕"}</button></span>`).join("")}</div>
@@ -878,7 +886,9 @@ function sett() {
  <button class="btn s" data-act="newcat">＋ Nuova categoria</button>
  <div class="mu" style="margin-top:8px">Le categorie archiviate non compaiono nelle nuove spese ma restano nello storico.</div></div>
  <div class="card"><h2>Dati</h2><button class="btn s" style="margin-top:0" data-act="csvall">Esporta tutte le movimentazioni (CSV)</button><button class="btn s" data-act="csv">Esporta solo il ${y} (CSV)</button><button class="btn s" data-act="log">Registro modifiche</button>
-<button class="btn s" data-act="backup">Backup completo (.json)</button><button class="btn s" data-act="restore">Ripristina da backup</button></div>
+<button class="btn s" data-act="backup">Backup completo (.json)</button><button class="btn s" data-act="restore">Ripristina da backup</button>
+ <button class="btn s" data-act="drive">Backup su Google Drive</button><button class="btn s" data-act="driverestore">Ripristina da Google Drive</button>
+ <div class="mu" style="margin-top:6px">${drvLast() ? `Ultimo backup su Drive: ${fdt(drvLast())}.` : "Nessun backup su Drive fatto da questo dispositivo."}</div></div>
  <div class="card"><h2>Sicurezza</h2><button class="btn s" style="margin-top:0" data-act="biotoggle">${bioOn ? "Disattiva" : "Attiva"} sblocco con Face ID / impronta</button>
  <button class="btn s" data-act="setpw">${P.has_pw ? "Cambia" : "Imposta"} password di ripristino backup</button><div class="mu" style="margin-top:6px">${P.has_pw ? "Password di ripristino impostata." : "Non ancora impostata: senza non si può ripristinare un backup."}</div>
 <button class="btn s" data-act="logout">Esci dall'account</button></div></div>`;
@@ -1104,11 +1114,45 @@ function csv(y) {   // y = anno, oppure null per tutte le movimentazioni
   return "\ufeff" + CSVH + "\n" + rows.map(x => { const s = x.k === "s", t = x.k === "t"; return [x.d, x.d.slice(0, 4), +x.d.slice(5, 7), s ? "uscita" : t ? "trasferimento" : "entrata", s ? q(cat(x.cat).n) : "", s ? q(subN(x.cat, x.sub)) : "", q(NAMES[x.who]), n(x.a), n(t ? 0 : s ? -x.a : x.a), q(x.note), t ? q(NAMES[x.to]) : ""].join(";"); }).join("\n");
 }
 // esporta tutti i dati in un file .json
-async function backup() {
+async function collectBackup() {
   const get = async t => { const { data, error } = await sb.from(t).select("*"); if (error) throw error; return data; };
-  const b = { app: "duofin", version: 2, exported_at: new Date().toISOString(), categories: await get("categories"), subcategories: await get("subcategories"), transactions: await get("transactions"), year_settings: await get("year_settings"), recurrences: await get("recurrences") };
-  download("duofin-backup-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(b, null, 1), "application/json");
+  return { app: "duofin", version: 2, exported_at: new Date().toISOString(), categories: await get("categories"), subcategories: await get("subcategories"), transactions: await get("transactions"), year_settings: await get("year_settings"), recurrences: await get("recurrences") };
 }
+async function backup() { download("duofin-backup-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(await collectBackup(), null, 1), "application/json"); }
+
+/* ---------------- backup su Google Drive ---------------- */
+// Il token Google si chiede dal browser (Google Identity Services) con il permesso drive.file: l'app vede solo il file che crea lei.
+// Serve CONFIG.GOOGLE_CLIENT_ID in config.js. Un solo file "DuoFin-backup.json", riscritto a ogni backup (Drive conserva le versioni precedenti).
+const DRV_NAME = "DuoFin-backup.json", drvKey = () => "duofin.drive." + (P.id || "");
+let gTok = null, gExp = 0, gLib = null;
+const gisLoad = () => gLib || (gLib = new Promise((ok, ko) => { const s = document.createElement("script"); s.src = "https://accounts.google.com/gsi/client"; s.onload = ok; s.onerror = () => { gLib = null; ko(new Error("Google non raggiungibile")); }; document.head.appendChild(s); }));
+async function gToken() {
+  if (!CONFIG.GOOGLE_CLIENT_ID) throw new Error("Backup su Drive non ancora configurato");
+  if (gTok && Date.now() < gExp) return gTok;
+  await gisLoad();
+  return new Promise((ok, ko) => google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.GOOGLE_CLIENT_ID, scope: "https://www.googleapis.com/auth/drive.file", hint: P.email || "",
+    callback: r => { if (r.error) return ko(new Error("Accesso a Google non riuscito")); gTok = r.access_token; gExp = Date.now() + (r.expires_in - 60) * 1000; ok(gTok); },
+    error_callback: () => ko(new Error("Finestra di Google chiusa"))
+  }).requestAccessToken({ prompt: "" }));
+}
+async function drvFetch(url, opt, raw) {
+  const r = await fetch(url, { ...opt, headers: { Authorization: "Bearer " + await gToken(), ...((opt || {}).headers) } });
+  if (!r.ok) { if (r.status === 401) gTok = null; throw new Error("Drive: errore " + r.status); }
+  return raw ? r.text() : r.json();
+}
+const drvFind = async () => { const f = await drvFetch("https://www.googleapis.com/drive/v3/files?spaces=drive&fields=files(id)&q=" + encodeURIComponent("name='" + DRV_NAME + "' and trashed=false")); return f.files && f.files[0] ? f.files[0].id : null; };
+async function driveBackup() {
+  const body = JSON.stringify(await collectBackup(), null, 1), id = await drvFind();
+  if (id) await drvFetch("https://www.googleapis.com/upload/drive/v3/files/" + id + "?uploadType=media", { method: "PATCH", headers: { "Content-Type": "application/json" }, body });
+  else {
+    const bd = "duofin" + Date.now();
+    await drvFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", { method: "POST", headers: { "Content-Type": "multipart/related; boundary=" + bd },
+      body: "--" + bd + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify({ name: DRV_NAME, mimeType: "application/json" }) + "\r\n--" + bd + "\r\nContent-Type: application/json\r\n\r\n" + body + "\r\n--" + bd + "--" });
+  }
+  try { localStorage.setItem(drvKey(), new Date().toISOString().slice(0, 10)); } catch (_) { }
+}
+const drvLast = () => { try { return localStorage.getItem(drvKey()) || ""; } catch (_) { return ""; } };
 
 /* ---------------- registro modifiche ---------------- */
 let LOG = [];
@@ -1249,6 +1293,8 @@ document.addEventListener("click", async e => {
   else if (a === "chicon") { const c = cat(id); ED = { cid: id }; pickI = c.i; dlg(`<h2>Icona di ${esc(c.n)}</h2>${icoGrid(c.i)}<button class="btn" data-act="saveicon">Salva</button><button class="btn s" data-act="close">Annulla</button>`); }
   else if (a === "saveicon") { $("#dlg").close(); run(() => sb.from("categories").update({ icon: pickI }).eq("id", ED.cid).then(chk), "Icona aggiornata"); }
   else if (a === "invite") { const e = $("#pe").value.trim(); const { error } = await sb.rpc("invite_partner", { email: e }); if (error) return toast(error.message.charAt(0).toUpperCase() + error.message.slice(1)); await loadProfile(); render(); toast("Invito inviato"); }
+  else if (a === "allowadd") { const { error } = await sb.rpc("admin_allow_email", { email: $("#ae").value }); if (error) return toast(error.message.charAt(0).toUpperCase() + error.message.slice(1)); await loadProfile(); render(); toast("Email abilitata"); }
+  else if (a === "allowdel") { await sb.rpc("admin_disallow_email", { email: b.dataset.e }); await loadProfile(); render(); }
   else if (a === "cancelinv") { await sb.rpc("cancel_invite", { id }); await loadProfile(); render(); }
   else if (a === "ansinv") askInvite(id, b.dataset.v === "1");
   else if (a === "jointname") { const { error } = await sb.rpc("set_joint_name", { name: $("#jn").value }); if (error) return toast("Scrivi un nome"); await loadProfile(); render(); toast("Nome aggiornato"); }
@@ -1276,6 +1322,19 @@ document.addEventListener("click", async e => {
   else if (a === "csv") download("duofin-movimenti-" + S.year + ".csv", csv(S.year), "text/csv;charset=utf-8");
   else if (a === "csvall") download("duofin-movimenti-completi-" + new Date().toISOString().slice(0, 10) + ".csv", csv(null), "text/csv;charset=utf-8");
   else if (a === "backup") { try { await backup(); toast("Backup scaricato"); } catch (er) { toast("Errore: " + er.message); } }
+  else if (a === "drive") { toast("Backup su Drive in corso…"); try { await driveBackup(); render(); toast("Backup salvato su Google Drive"); } catch (er) { toast(er.message); } }
+  else if (a === "driverestore") dlg(`<h2>Ripristina da Google Drive</h2><div class="mu" id="rm">Prende il file "DuoFin-backup.json" dal tuo Drive e sostituisce tutti i dati attuali. ${P.has_pw ? "" : "Prima imposta la password di ripristino in Impostazioni › Sicurezza."}</div><label>Password di ripristino</label><input id="rp" type="password" autocomplete="off"><button class="btn d" data-act="dodriverestore">Ripristina</button><button class="btn s" data-act="close">Annulla</button>`);
+  else if (a === "dodriverestore") {
+    const err = t => { $("#rm").textContent = t; $("#rm").style.color = "#e5484d"; armed = false; b.textContent = "Ripristina"; };
+    if (!$("#rp").value) return err("Inserisci la password.");
+    if (!armed) { armed = true; b.textContent = "Conferma ripristino"; return; }
+    try {
+      const id = await drvFind(); if (!id) return err("Nessun backup trovato su questo Drive.");
+      const payload = JSON.parse(await drvFetch("https://www.googleapis.com/drive/v3/files/" + id + "?alt=media", {}, true)); if (!payload.transactions || !payload.categories) return err("File non valido.");
+      const { error } = await sb.rpc("restore_backup", { pw: $("#rp").value, payload }); if (error) return err(error.message.includes("non impostata") ? "Password di ripristino non impostata." : error.message.includes("password") ? "Password errata." : "Errore: " + error.message);
+      armed = false; $("#dlg").close(); await loadAll(); render(); toast("Backup ripristinato da Drive");
+    } catch (er) { err(er.message || "Errore"); }
+  }
   else if (a === "restore") dlg(`<h2>Ripristina backup</h2><label>File di backup (.json)</label><input id="rf" type="file" accept=".json,application/json"><label>Password di ripristino</label><input id="rp" type="password" autocomplete="off">
   <div class="mu" id="rm" style="margin-top:8px">${P.has_pw ? "Il ripristino sostituisce tutti i dati attuali." : "Prima imposta la password di ripristino in Impostazioni › Sicurezza."}</div><button class="btn d" data-act="dorestore">Ripristina</button><button class="btn s" data-act="close">Annulla</button>`);
   else if (a === "dorestore") {
