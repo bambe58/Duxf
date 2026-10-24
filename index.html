@@ -390,7 +390,7 @@ function applySkin(id, save) {
   document.documentElement.dataset.skin = id;
   PAL.splice(0, PAL.length, ...(p || PAL0)); YC = {}; skinColors();
   try { localStorage.setItem("duofin.skin.last", id); } catch (_) { }
-  if (save) sb.rpc("set_skin", { skin: id });
+  if (save) sb.rpc("set_skin", { skin: id }).then(r => { if (r.error) toast("Tema non salvato: " + r.error.message); });
 }
 document.documentElement.dataset.skin = SK;
 { const p = SKINS.find(s => s.id === SK).pal; if (p) PAL.splice(0, PAL.length, ...p); }
@@ -904,7 +904,7 @@ function sett() {
  ${P.allowed.map(u => `<div class="mem"><span class="g"><b>${esc(u.email)}</b><div class="mu">${u.is_admin ? "amministratore" : u.registered ? "registrato" : "in attesa del primo accesso"}</div></span>${u.is_admin || u.registered ? "" : `<button class="pill" data-act="allowdel" data-e="${esc(u.email)}">Togli</button>`}</div>`).join("")}
  <label>Abilita una nuova email</label><div class="row2"><input id="ae" type="email" placeholder="nome@email.it" autocomplete="off"><button class="pill on" data-act="allowadd">Abilita</button></div></div>` : "";
   const aspetto = `<div class="card"><h2>Aspetto</h2><div class="mu" style="margin:-4px 0 8px">Vale solo per il tuo account (${esc(me.name || "")}).</div>${SKINS.map(k => `<button class="skin ${k.id === SK ? "on" : ""}" data-act="skin" data-s="${k.id}"><span class="sws">${k.sw.map(c => `<i style="background:${c}"></i>`).join("")}</span><span class="g"><b>${k.n}</b><span class="mu">${k.d}</span></span><span class="chk">${k.id === SK ? "✓" : ""}</span></button>`).join("")}
- ${SK !== "classico" ? `<div class="mu" style="margin-top:8px">In questo aspetto i colori delle categorie seguono il tema. Nel Classico tornano quelli che hai scelto tu.</div>` : ""}</div>`;
+</div>`;
   return `<div class="view"><div class="card"><h2>Quota mensile ${y}</h2><label>Versamento mensile a testa (€)</label><input id="q" type="number" value="${quotaOf(y) || ""}" inputmode="decimal">
  ${S.quota[y] === undefined && quotaFrom(y) !== null ? `<div class="mu" style="margin-top:6px">Uguale a quella del ${quotaFrom(y)}. Modificala e salva solo se cambia.</div>` : ""}
  <button class="btn" data-act="saveq">Salva quota</button></div>
