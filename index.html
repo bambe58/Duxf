@@ -81,7 +81,7 @@ dialog::backdrop{background:rgba(10,12,30,.5);backdrop-filter:blur(3px)}
 dialog[open]{animation:pop .25s cubic-bezier(.2,.9,.3,1.2)}@keyframes pop{from{opacity:0;transform:translateY(24px) scale(.96)}}
 .toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-size:13px;font-weight:700;opacity:0;transition:.3s;z-index:20;pointer-events:none}
 .toast.on{opacity:1;transform:translate(-50%,0)}
-.sw{display:flex;gap:8px;margin-top:6px}.sw i{width:26px;height:26px;border-radius:50%;cursor:pointer;border:3px solid transparent}.sw i.on{border-color:var(--ink)}
+.sw{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.sw i{width:26px;height:26px;border-radius:50%;cursor:pointer;border:3px solid transparent}.sw i.on{border-color:var(--ink)}
 .sub{display:inline-block;background:var(--bg);border-radius:99px;padding:4px 10px;font-size:12px;margin:3px 4px 3px 0}
 .lock{position:fixed;inset:0;background:linear-gradient(160deg,var(--F),var(--M));z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;padding:30px}
 .lock.on{display:flex}.lock input{width:min(300px,100%);max-width:260px;text-align:center;background:#ffffff30;border:0;color:#fff}
@@ -335,6 +335,30 @@ const ICONS = {
   assicurazione: ["Assicurazioni", "<path d=\"M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>"],
   chiavi: ["Affitto", "<circle cx=\"8\" cy=\"15\" r=\"4\"/><path d=\"M11 12l9-9M16 7l3 3\"/>"],
   coins: ["Risparmi", "<ellipse cx=\"12\" cy=\"6\" rx=\"7\" ry=\"3\"/><path d=\"M5 6v6c0 1.7 3 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3 3 7 3s7-1.3 7-3v-6\"/>"],
+  aeroplano: ["Aereo", "<path d=\"M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z\"/>"],
+  palma: ["Palma", "<path d=\"M12 21c0-4 .3-7 1.5-11M13.5 10C11 5.5 6 5.5 3.5 8.5M13.5 10C14 5.5 17.5 3.5 21 5M13.5 10c3-2 6-1.5 7.5 1.5M13.5 10c-3 0-6 2-7 5M5 21h14\"/>"],
+  sole: ["Sole", "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1\"/>"],
+  mare: ["Mare", "<path d=\"M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4-1.5 6 0M2 13c2.5-2 4.5-2 7 0s4.5 2 7 0 4-1.5 6 0M2 18c2.5-2 4.5-2 7 0s4.5 2 7 0 4-1.5 6 0\"/>"],
+  valigia: ["Valigia", "<rect x=\"4\" y=\"8\" width=\"16\" height=\"12\" rx=\"2\"/><path d=\"M9 8V6a1 1 0 011-1h4a1 1 0 011 1v2M4 13h16M10 12v3h4v-3\"/>"],
+  nave: ["Nave", "<path d=\"M3 17l2 3.5h14L21 17zM6 17v-5h12v5M10 12V8h4v4M12 3v5\"/>"],
+  treno: ["Treno", "<rect x=\"5\" y=\"3\" width=\"14\" height=\"14\" rx=\"3\"/><path d=\"M5 11h14M8 21l2-4M16 21l-2-4\"/><circle cx=\"9\" cy=\"14\" r=\".7\"/><circle cx=\"15\" cy=\"14\" r=\".7\"/>"],
+  moto: ["Moto", "<circle cx=\"6\" cy=\"16\" r=\"3\"/><circle cx=\"18\" cy=\"16\" r=\"3\"/><path d=\"M6 16l3-6h5l4 6M9 10L8 7H6M14 10l-1-3h3\"/>"],
+  carburante: ["Carburante", "<path d=\"M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16M4 21h12M5 10h10M15 8l3 2v7a1.5 1.5 0 003 0V9l-3-3\"/>"],
+  tenda: ["Campeggio", "<path d=\"M2 20L12 4l10 16zM12 20l-3-8M12 20l3-8\"/>"],
+  montagna: ["Montagna", "<path d=\"M2 20l7-12 4 7 3-4 6 9zM9 8l2 4\"/>"],
+  hotel: ["Hotel", "<path d=\"M3 19V6M3 15h18v4M21 15v-3a3 3 0 00-3-3h-7v6\"/><circle cx=\"7\" cy=\"11.5\" r=\"1.5\"/>"],
+  pizza: ["Pizza", "<path d=\"M3 6c5-3 13-3 18 0L12 21z\"/><circle cx=\"9\" cy=\"9.5\" r=\".8\"/><circle cx=\"14\" cy=\"8.5\" r=\".8\"/><circle cx=\"11.5\" cy=\"13\" r=\".8\"/>"],
+  gelato: ["Gelato", "<path d=\"M7 11a5 5 0 0110 0zM8 11l4 11 4-11M10 7.5a2 2 0 014 0\"/>"],
+  birra: ["Bar", "<path d=\"M6 8h10v11a1 1 0 01-1 1H7a1 1 0 01-1-1zM16 10h2a2 2 0 012 2v3a2 2 0 01-2 2h-2M6 8c0-3 3-4 5-3 1.5-1 5 0 5 3M9.5 12v5M12.5 12v5\"/>"],
+  giochi: ["Giochi", "<rect x=\"2\" y=\"7\" width=\"20\" height=\"11\" rx=\"5\"/><path d=\"M7 10v5M4.5 12.5h5\"/><circle cx=\"15.5\" cy=\"11.5\" r=\".8\"/><circle cx=\"18\" cy=\"14\" r=\".8\"/>"],
+  fotocamera: ["Foto", "<path d=\"M4 8h3l2-3h6l2 3h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z\"/><circle cx=\"12\" cy=\"13\" r=\"3.5\"/>"],
+  forbici: ["Parrucchiere", "<circle cx=\"6\" cy=\"7\" r=\"2.5\"/><circle cx=\"6\" cy=\"17\" r=\"2.5\"/><path d=\"M8 8.5L20 18M8 15.5L20 6\"/>"],
+  pillola: ["Farmaci", "<rect x=\"3\" y=\"9\" width=\"18\" height=\"6\" rx=\"3\" transform=\"rotate(-45 12 12)\"/><path d=\"M9 15l6-6\"/>"],
+  dente: ["Dentista", "<path d=\"M7 3C4.5 3 3 5 3 7.5 3 12 6 12 6 17c0 2 .5 4 2 4s1.5-4 4-4 2.5 4 4 4 2-2 2-4c0-5 3-5 3-9.5C21 5 19.5 3 17 3c-2 0-3 1-5 1S9 3 7 3z\"/>"],
+  divano: ["Arredamento", "<path d=\"M5 11V8a2 2 0 012-2h10a2 2 0 012 2v3M3 13a2 2 0 014 0v1h10v-1a2 2 0 014 0v5H3zM5 18v2M19 18v2\"/>"],
+  pulizie: ["Pulizie", "<path d=\"M5 9h14l-1.5 11h-11zM8 9a4 4 0 018 0M3 9h18\"/>"],
+  carta: ["Carta", "<rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M2 10h20M6 15h4\"/>"],
+  natale: ["Feste", "<path d=\"M12 3l-5 6h3l-4 5h4l-3 4h10l-3-4h4l-4-5h3zM12 18v3\"/>"],
   altro: ["Altro", "<path d=\"M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8\"/>"]
 };
 const ico = (k, sm) => ICONS[k] ? `<svg class="gi${sm ? " sm" : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k][1]}</svg>` : esc(k || "");
@@ -354,6 +378,8 @@ const SKINS = [
   { id: "blu", n: "Progetto blu", d: "Sfondo blu da disegno tecnico, linee tratteggiate e testo a spaziatura fissa.", sw: ["#2a6bb8", "#ffd54a", "#7fffd4"], pal: ["#ffffff", "#ffd54a", "#7fffd4", "#ff8a80", "#b9d4ff", "#ffe9a8", "#9fc4ff", "#c8e1ff"] }
 ];
 const PAL0 = PAL.slice();
+const CATCOL = [...PAL0, "#e5484d", "#2fb344", "#f5d90a", "#9c6b3f", "#2b2f42", "#4aa8ff"];   // colori scelti per una categoria: i soliti piu' rosso, verde, giallo, marrone, nero, azzurro
+const swatches = cur => `<div class="sw" id="sw">${CATCOL.map(c => `<i data-act="pick" data-c="${c}" class="${c === cur ? "on" : ""}" style="background:${c}"></i>`).join("")}</div>`;
 let SK = "classico";
 try { SK = localStorage.getItem("duofin.skin.last") || "classico"; } catch (_) { }
 if (!SKINS.some(s => s.id === SK)) SK = "classico";
@@ -1395,8 +1421,8 @@ document.addEventListener("click", async e => {
   else if (a === "pick") { pick = b.dataset.c; document.querySelectorAll("#sw i").forEach(i => i.classList.toggle("on", i === b)); }
   else if (a === "opencat") { S.openCat = S.openCat === id ? null : id; render(); }
   else if (a === "pickicon") { pickI = b.dataset.k; document.querySelectorAll(".igrid .ig").forEach(i => i.classList.toggle("on", i === b)); }
-  else if (a === "chicon") { const c = cat(id); ED = { cid: id }; pickI = c.i; dlg(`<h2>Icona di ${esc(c.n)}</h2>${icoGrid(c.i)}<button class="btn" data-act="saveicon">Salva</button><button class="btn s" data-act="close">Annulla</button>`); }
-  else if (a === "saveicon") { $("#dlg").close(); run(() => sb.from("categories").update({ icon: pickI }).eq("id", ED.cid).then(chk), "Icona aggiornata"); }
+  else if (a === "chicon") { const c = cat(id); ED = { cid: id }; pickI = c.i; pick = c.c0; dlg(`<h2>Icona e colore di ${esc(c.n)}</h2>${icoGrid(c.i)}<label>Colore</label>${swatches(c.c0)}<button class="btn" data-act="saveicon">Salva</button><button class="btn s" data-act="close">Annulla</button>`); }
+  else if (a === "saveicon") { $("#dlg").close(); run(() => sb.from("categories").update({ icon: pickI, color: pick }).eq("id", ED.cid).then(chk), "Categoria aggiornata"); }
   else if (a === "invite") { const e = $("#pe").value.trim(); const { error } = await sb.rpc("invite_partner", { email: e }); if (error) return toast(error.message.charAt(0).toUpperCase() + error.message.slice(1)); await loadProfile(); render(); toast("Invito inviato"); }
   else if (a === "allowadd") { const { error } = await sb.rpc("admin_allow_email", { email: $("#ae").value }); if (error) return toast(error.message.charAt(0).toUpperCase() + error.message.slice(1)); await loadProfile(); render(); toast("Email abilitata"); }
   else if (a === "allowdel") { await sb.rpc("admin_disallow_email", { email: b.dataset.e }); await loadProfile(); render(); }
@@ -1415,7 +1441,7 @@ document.addEventListener("click", async e => {
   else if (a === "dlshare") { try { await navigator.share({ files: [new File([DL.text], DL.name, { type: DL.mime })], title: DL.name }); } catch (_) { } }
   else if (a === "lmode") setMode(b.dataset.m);
   else if (a === "newcat") { pick = PAL0[0]; pickI = "casa"; dlg(`<h2>Nuova categoria</h2><label>Nome</label><input id="nc"><label>Icona</label>${icoGrid("casa")}<label>Colore</label>
-  <div class="sw" id="sw">${PAL0.map((c, i) => `<i data-act="pick" data-c="${c}" class="${i === 0 ? "on" : ""}" style="background:${c}"></i>`).join("")}</div>
+  ${swatches(PAL0[0])}
   <button class="btn" data-act="addcat">Crea categoria</button><button class="btn s" data-act="close">Annulla</button>`); }
   else if (a === "addcat") {
     const n = $("#nc").value.trim().toUpperCase(); if (!n) return; $("#dlg").close();
