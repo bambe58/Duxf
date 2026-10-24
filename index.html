@@ -74,6 +74,7 @@ label{display:block;font-size:12px;color:var(--mu);margin:12px 0 4px;font-weight
 .seg{display:flex;gap:6px}.seg button{flex:1;padding:10px 4px;border-radius:14px;border:2px solid var(--ln);background:none;font-weight:600;font-size:13px;transition:.15s}
 .seg button.on{color:#fff;border-color:transparent}
 .btn{width:100%;margin-top:14px;padding:14px;border:0;border-radius:16px;background:var(--ink);color:var(--bg);font-weight:800;font-size:15px}
+input[data-ren],input[data-sub],#nc,#rn{text-transform:uppercase}
 .btn.s{background:var(--ln);color:var(--ink)}.btn.d{background:#e5484d;color:#fff}
 dialog{border:0;border-radius:26px;padding:20px;width:min(440px,94vw);background:var(--card);color:var(--ink);max-height:90vh}
 dialog::backdrop{background:rgba(10,12,30,.5);backdrop-filter:blur(3px)}
@@ -1096,7 +1097,7 @@ document.addEventListener("change", e => {
   else if (t.id === "yya") { const o = ST.ya; ST.ya = +t.value; if (ST.ya === ST.yb) ST.yb = o; S.still = true; render(); }
   else if (t.id === "yyb") { const o = ST.yb; ST.yb = +t.value; if (ST.yb === ST.ya) ST.ya = o; S.still = true; render(); }
   else if (t.id === "yym") { ST.ym = +t.value; S.still = true; render(); }
-  else if (t.dataset.ren) { const [k, id] = t.dataset.ren.split(":"), n = t.value.trim(); if (n) run(() => sb.from("categories").update({ name: n }).eq("id", id).then(chk), "Categoria rinominata"); }
+  else if (t.dataset.ren) { const [k, id] = t.dataset.ren.split(":"), n = t.value.trim().toUpperCase(); if (n) run(() => sb.from("categories").update({ name: n }).eq("id", id).then(chk), "Categoria rinominata"); }
 });
 const chk = r => { if (r.error) throw r.error; return r; };
 
@@ -1170,8 +1171,8 @@ function impParse(grid) {
       const cn = cell(g("categoria")), sn = cell(g("sottocategoria")) || "Generale";
       if (!cn) { bad("categoria mancante"); continue; }
       ck = nrm(cn); sk = nrm(sn);
-      if (!cats.has(ck)) cats.set(ck, { name: cn, id: null, subs: new Map() });
-      const o = cats.get(ck); if (!o.subs.has(sk)) o.subs.set(sk, { name: sn, id: null });
+      if (!cats.has(ck)) cats.set(ck, { name: cn.toUpperCase(), id: null, subs: new Map() });
+      const o = cats.get(ck); if (!o.subs.has(sk)) o.subs.set(sk, { name: sn.toUpperCase(), id: null });
     }
     rows.push({ tp, who, a: Math.round(a * 100), d, note, ck, sk });
   }
@@ -1199,7 +1200,7 @@ async function impTemplate() {
   const info = XLSX.utils.aoa_to_sheet([["Come compilare il foglio Movimenti"], [""],
     ["data_movimento: gg/mm/aaaa oppure aaaa-mm-gg"], ["tipologia: spesa oppure versamento"],
     ["utente: " + NAMES.F + ", " + NAMES.M + ", " + NAMES.J + " (solo spese) oppure Extra (solo versamenti)"],
-    ["importo: numero maggiore di zero (es. 45,50)"], ["categoria e sottocategoria: obbligatorie per le spese; se mancano nell'app vengono create; la sottocategoria vuota diventa Generale"],
+    ["importo: numero maggiore di zero (es. 45,50)"], ["categoria e sottocategoria: obbligatorie per le spese; se mancano nell'app vengono create (i nomi sono sempre in maiuscolo); la sottocategoria vuota diventa Generale"],
     ["note: facoltativa, ma obbligatoria per Extra (scrivi chi versa)"], ["Cancella le righe di esempio prima di importare."]]);
   info["!cols"] = [{ wch: 100 }];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Movimenti"); XLSX.utils.book_append_sheet(wb, info, "Istruzioni");
@@ -1386,9 +1387,9 @@ document.addEventListener("click", async e => {
   }
   else if (a === "del") { if (!armed) { armed = true; b.textContent = "Conferma eliminazione"; return; } armed = false; $("#dlg").close(); run(() => sb.from("transactions").delete().eq("id", ED.id).then(chk), "Movimento eliminato"); }
   else if (a === "saveq") { const q = Math.round((parseFloat($("#q").value) || 0) * 100); run(() => sb.from("year_settings").upsert({ year: S.year, monthly_quota_cents: q }, { onConflict: "household_id,year" }).then(chk), "Quota salvata"); }
-  else if (a === "addsub") { const n = document.querySelector(`[data-sub="${id}"]`).value.trim(); if (n) run(() => sb.from("subcategories").insert({ category_id: id, name: n }).then(chk), "Sottocategoria aggiunta"); }
+  else if (a === "addsub") { const n = document.querySelector(`[data-sub="${id}"]`).value.trim().toUpperCase(); if (n) run(() => sb.from("subcategories").insert({ category_id: id, name: n }).then(chk), "Sottocategoria aggiunta"); }
   else if (a === "rensub") { const s = S.cats.flatMap(c => c.subs).find(x => x.id === id); ED = { sid: id }; dlg(`<h2>Rinomina sottocategoria</h2><input id="rn" value="${esc(s.n)}"><button class="btn" data-act="dorensub">Salva</button><button class="btn s" data-act="close">Annulla</button>`); }
-  else if (a === "dorensub") { const n = $("#rn").value.trim(); if (!n) return; $("#dlg").close(); run(() => sb.from("subcategories").update({ name: n }).eq("id", ED.sid).then(chk), "Sottocategoria rinominata"); }
+  else if (a === "dorensub") { const n = $("#rn").value.trim().toUpperCase(); if (!n) return; $("#dlg").close(); run(() => sb.from("subcategories").update({ name: n }).eq("id", ED.sid).then(chk), "Sottocategoria rinominata"); }
   else if (a === "archsub") { const s = S.cats.flatMap(c => c.subs).find(x => x.id === id); run(() => sb.from("subcategories").update({ archived: !s.arch }).eq("id", id).then(chk), s.arch ? "Ripristinata" : "Archiviata"); }
   else if (a === "archcat") { const c = cat(id); run(() => sb.from("categories").update({ archived: !c.arch }).eq("id", id).then(chk), c.arch ? "Ripristinata" : "Archiviata"); }
   else if (a === "pick") { pick = b.dataset.c; document.querySelectorAll("#sw i").forEach(i => i.classList.toggle("on", i === b)); }
@@ -1417,8 +1418,8 @@ document.addEventListener("click", async e => {
   <div class="sw" id="sw">${PAL0.map((c, i) => `<i data-act="pick" data-c="${c}" class="${i === 0 ? "on" : ""}" style="background:${c}"></i>`).join("")}</div>
   <button class="btn" data-act="addcat">Crea categoria</button><button class="btn s" data-act="close">Annulla</button>`); }
   else if (a === "addcat") {
-    const n = $("#nc").value.trim(); if (!n) return; $("#dlg").close();
-    run(async () => { const r = chk(await sb.from("categories").insert({ name: n, color: pick, icon: pickI }).select().single()); chk(await sb.from("subcategories").insert({ category_id: r.data.id, name: "Generale" })); }, "Categoria aggiunta");
+    const n = $("#nc").value.trim().toUpperCase(); if (!n) return; $("#dlg").close();
+    run(async () => { const r = chk(await sb.from("categories").insert({ name: n, color: pick, icon: pickI }).select().single()); chk(await sb.from("subcategories").insert({ category_id: r.data.id, name: "GENERALE" })); }, "Categoria aggiunta");
   }
   else if (a === "cgok") { try { localStorage.setItem(cgKey(CGOPEN), "1"); } catch (_) { } CGOPEN = null; $("#dlg").close(); }
   else if (a === "log") loadLog(false);

@@ -349,3 +349,12 @@ grant select on public.audit_log, public.profiles, public.households to authenti
 
 -- aggiornamenti in tempo reale tra i due telefoni
 alter publication supabase_realtime add table public.categories, public.subcategories, public.recurrences, public.transactions, public.year_settings;
+
+-- nomi di categorie e sottocategorie sempre in MAIUSCOLO
+create or replace function public._upper_name() returns trigger language plpgsql as $$
+begin new.name := upper(btrim(new.name)); return new; end $$;
+
+drop trigger if exists upper_name on public.categories;
+create trigger upper_name before insert or update of name on public.categories for each row execute function public._upper_name();
+drop trigger if exists upper_name on public.subcategories;
+create trigger upper_name before insert or update of name on public.subcategories for each row execute function public._upper_name();
