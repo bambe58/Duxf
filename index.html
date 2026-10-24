@@ -1195,7 +1195,7 @@ function impParse(grid) {
     if (who === "E" && !note) { bad("per Extra la nota è obbligatoria (chi versa)"); continue; }
     let ck = "", sk = "";
     if (tp === "s") {
-      const cn = cell(g("categoria")), sn = cell(g("sottocategoria")) || "Generale";
+      const cn = cell(g("categoria")), sn = cell(g("sottocategoria")) || "Varie";
       if (!cn) { bad("categoria mancante"); continue; }
       ck = nrm(cn); sk = nrm(sn);
       if (!cats.has(ck)) cats.set(ck, { name: cn.toUpperCase(), id: null, subs: new Map() });
@@ -1227,7 +1227,7 @@ async function impTemplate() {
   const info = XLSX.utils.aoa_to_sheet([["Come compilare il foglio Movimenti"], [""],
     ["data_movimento: gg/mm/aaaa oppure aaaa-mm-gg"], ["tipologia: spesa oppure versamento"],
     ["utente: " + NAMES.F + ", " + NAMES.M + ", " + NAMES.J + " (solo spese) oppure Extra (solo versamenti)"],
-    ["importo: numero maggiore di zero (es. 45,50)"], ["categoria e sottocategoria: obbligatorie per le spese; se mancano nell'app vengono create (i nomi sono sempre in maiuscolo); la sottocategoria vuota diventa Generale"],
+    ["importo: numero maggiore di zero (es. 45,50)"], ["categoria e sottocategoria: obbligatorie per le spese; se mancano nell'app vengono create (i nomi sono sempre in maiuscolo); la sottocategoria vuota diventa Varie"],
     ["note: facoltativa, ma obbligatoria per Extra (scrivi chi versa)"], ["Cancella le righe di esempio prima di importare."]]);
   info["!cols"] = [{ wch: 100 }];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Movimenti"); XLSX.utils.book_append_sheet(wb, info, "Istruzioni");
@@ -1447,7 +1447,7 @@ document.addEventListener("click", async e => {
   <button class="btn" data-act="addcat">Crea categoria</button><button class="btn s" data-act="close">Annulla</button>`); }
   else if (a === "addcat") {
     const n = $("#nc").value.trim().toUpperCase(); if (!n) return; $("#dlg").close();
-    run(async () => { const r = chk(await sb.from("categories").insert({ name: n, color: pick, icon: pickI }).select().single()); chk(await sb.from("subcategories").insert({ category_id: r.data.id, name: "GENERALE" })); }, "Categoria aggiunta");
+    run(async () => { const r = chk(await sb.from("categories").insert({ name: n, color: pick, icon: pickI }).select().single()); chk(await sb.from("subcategories").insert({ category_id: r.data.id, name: "VARIE" })); }, "Categoria aggiunta");
   }
   else if (a === "cgok") { try { localStorage.setItem(cgKey(CGOPEN), "1"); } catch (_) { } CGOPEN = null; $("#dlg").close(); }
   else if (a === "log") loadLog(false);
