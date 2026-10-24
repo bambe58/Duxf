@@ -416,7 +416,7 @@ async function fetchAll(table, order) {
 async function loadAll() {
   const [c, s, t, q, rc, lg] = await Promise.all([fetchAll("categories", "name"), fetchAll("subcategories", "name"), fetchAll("transactions", "tx_date"), fetchAll("year_settings", "year"), fetchAll("recurrences", "anchor_date"), sb.from("audit_log").select("*").order("at", { ascending: false }).range(0, 14)]);
   S.rec = {}; rc.forEach(r => S.rec[r.id] = { id: r.id, freq: r.freq, anchor: r.anchor_date, active: r.active }); S.log = lg.data || [];
-  S.cats = c.map(x => ({ id: x.id, n: x.name, c: x.color, c0: x.color, i: x.icon, arch: x.archived, subs: s.filter(y => y.category_id === x.id).map(y => ({ id: y.id, n: y.name, arch: y.archived })) }));
+  S.cats = c.map(x => ({ id: x.id, n: x.name, c: x.color, c0: x.color, i: x.icon, arch: x.archived, subs: s.filter(y => y.category_id === x.id).map(y => ({ id: y.id, n: y.name, i: y.icon || null, arch: y.archived })) }));
   S.tx = t.map(x => ({ id: x.id, k: x.kind === "spesa" ? "s" : x.kind === "trasferimento" ? "t" : "v", a: x.amount_cents / 100, d: x.tx_date, cat: x.category_id || "", sub: x.subcategory_id || "", who: x.payer, to: x.payee || null, note: x.note || "", rec: x.rec_id || null }));
   S.quota = {}; q.forEach(r => S.quota[r.year] = r.monthly_quota_cents / 100);
   skinColors(); YC = {};
@@ -475,6 +475,7 @@ async function runRecurrences() {
 /* ---------------- calcoli ---------------- */
 const cat = id => S.cats.find(c => c.id === id) || { n: "Versamento", c: "#12b5a0", i: "coins", subs: [] };
 const subN = (c, s) => (cat(c).subs.find(x => x.id === s) || {}).n || "";
+const subI = (c, s) => (cat(c).subs.find(x => x.id === s) || {}).i || null;   // icona propria della sottocategoria (se manca vale quella della categoria)
 const years = () => [...new Set([CY, ...S.tx.map(x => +x.d.slice(0, 4)), ...Object.keys(S.quota).map(Number)])].sort();
 
 // quota di un anno: se non è stata impostata, vale quella dell'ultimo anno precedente che ce l'ha
@@ -528,7 +529,7 @@ function row(x) {
   if (x.k === "t") return `<button class="row" data-act="edit" data-id="${x.id}"><div class="ic tri">⇄</div><div class="g"><div class="t">Trasferimento${x.note ? " · " + esc(x.note) : ""}</div>
  <div class="mu">${NAMES[x.who]} → ${NAMES[x.to]} · ${x.d.slice(8)}/${x.d.slice(5, 7)}/${x.d.slice(0, 4)}</div></div><div class="amt tra">${eur2(x.a)}</div></button>`;
   const k = cat(x.cat), v = x.k === "v";
-  return `<button class="row" data-act="edit" data-id="${x.id}"><div class="ic" style="--cc:${k.c}">${ico(k.i)}</div><div class="g"><div class="t">${v ? "Versamento" + (x.note ? " · " + esc(x.note) : "") : esc(subN(x.cat, x.sub) || k.n)}</div>
+  return `<button class="row" data-act="edit" data-id="${x.id}"><div class="ic" style="--cc:${k.c}">${ico(subI(x.cat, x.sub) || k.i)}</div><div class="g"><div class="t">${v ? "Versamento" + (x.note ? " · " + esc(x.note) : "") : esc(subN(x.cat, x.sub) || k.n)}</div>
  <div class="mu">${v ? NAMES[x.who] : esc(k.n) + " · " + NAMES[x.who]} · ${x.d.slice(8)}/${x.d.slice(5, 7)}/${x.d.slice(0, 4)}${!v && x.note ? " · " + esc(x.note) : ""}${x.rec && S.rec[x.rec] && S.rec[x.rec].active ? ` · ↻ ${FRQ[S.rec[x.rec].freq]}` : ""}</div></div>
  <div class="amt ${v ? "pos" : ""}">${v ? "+" : "−"}${eur2(x.a)}</div></button>`;
 }
@@ -912,7 +913,7 @@ function sett() {
  ${aspetto}${famiglia}${abilitati}${ricorrenze}<div class="card"><h2>Categorie</h2>${S.cats.map(c => { const o = S.openCat === c.id, n = c.subs.filter(x => !x.arch).length;
  return `<div class="cr ${c.arch ? "arch" : ""}"><button class="crh" data-act="opencat" data-id="${c.id}"><span class="ic" style="--cc:${c.c}">${ico(c.i)}</span><span class="g"><b>${esc(c.n)}</b><span class="mu"> · ${n} sottocategori${n === 1 ? "a" : "e"}${c.arch ? " · archiviata" : ""}</span></span><span class="chev">${o ? "▾" : "▸"}</span></button>
  ${o ? `<div class="crb"><div style="display:flex;gap:6px"><input data-ren="cat:${c.id}" value="${esc(c.n)}"><button class="pill" data-act="chicon" data-id="${c.id}">Icona</button><button class="pill" data-act="archcat" data-id="${c.id}">${c.arch ? "Ripristina" : "Archivia"}</button></div>
- <div style="margin-top:8px">${c.subs.map(x => `<span class="sub ${x.arch ? "arch" : ""}"><span data-act="rensub" data-id="${x.id}" style="cursor:pointer">${esc(x.n)}</span><button data-act="archsub" data-id="${x.id}" aria-label="${x.arch ? "Ripristina" : "Archivia"}">${x.arch ? "↺" : "✕"}</button></span>`).join("")}</div>
+ <div style="margin-top:8px">${c.subs.map(x => `<span class="sub ${x.arch ? "arch" : ""}"><span data-act="rensub" data-id="${x.id}" style="cursor:pointer">${x.i ? ico(x.i, true) + " " : ""}${esc(x.n)}</span><button data-act="archsub" data-id="${x.id}" aria-label="${x.arch ? "Ripristina" : "Archivia"}">${x.arch ? "↺" : "✕"}</button></span>`).join("")}</div>
  <div style="display:flex;gap:6px;margin-top:6px"><input data-sub="${c.id}" placeholder="Nuova sottocategoria"><button class="pill" data-act="addsub" data-id="${c.id}">Aggiungi</button></div></div>` : ""}</div>`; }).join("")}
  <button class="btn s" data-act="newcat">＋ Nuova categoria</button>
  <div class="mu" style="margin-top:8px">Le categorie archiviate non compaiono nelle nuove spese ma restano nello storico.</div></div>
@@ -1054,7 +1055,7 @@ function wDraw() {
     if (subs.length > 9) {
       body = `<div class="wlist">${subs.map(x => `<button data-act="wsub" data-id="${x.id}">${esc(x.n)}</button>`).join("")}</div><button class="wback" data-act="wback">← indietro</button>`;
     } else {
-      const items = subs.map(x => ({ n: x.n, c: c.c, act: "wsub", id: x.id, big: true })), n = items.length, z = Math.min(vw, 380, vh - 170), d = wBubD(Math.max(n, 3), z) * (n < 3 ? 1.1 : 1), R = (z - d) / 2, cd = Math.min(z * .3, 2 * (R - d / 2 - 8));
+      const items = subs.map(x => ({ n: x.n, c: c.c, k: x.i || undefined, act: "wsub", id: x.id, big: true })), n = items.length, z = Math.min(vw, 380, vh - 170), d = wBubD(Math.max(n, 3), z) * (n < 3 ? 1.1 : 1), R = (z - d) / 2, cd = Math.min(z * .3, 2 * (R - d / 2 - 8));
       body = `<div class="wst" style="width:${z}px;height:${z}px">${wBubs(items, z, z / 2, z / 2, R, d)}${wCenter(z, z / 2, z / 2, cd, `<span class="ic" style="--cc:${c.c};width:34px;height:34px;margin-bottom:2px">${ico(c.i)}</span><b style="font-size:14px">${esc(c.n)}</b>`)}</div>
       <button class="wback" data-act="wback">← indietro</button>`;
     }
@@ -1414,13 +1415,14 @@ document.addEventListener("click", async e => {
   else if (a === "del") { if (!armed) { armed = true; b.textContent = "Conferma eliminazione"; return; } armed = false; $("#dlg").close(); run(() => sb.from("transactions").delete().eq("id", ED.id).then(chk), "Movimento eliminato"); }
   else if (a === "saveq") { const q = Math.round((parseFloat($("#q").value) || 0) * 100); run(() => sb.from("year_settings").upsert({ year: S.year, monthly_quota_cents: q }, { onConflict: "household_id,year" }).then(chk), "Quota salvata"); }
   else if (a === "addsub") { const n = document.querySelector(`[data-sub="${id}"]`).value.trim().toUpperCase(); if (n) run(() => sb.from("subcategories").insert({ category_id: id, name: n }).then(chk), "Sottocategoria aggiunta"); }
-  else if (a === "rensub") { const s = S.cats.flatMap(c => c.subs).find(x => x.id === id); ED = { sid: id }; dlg(`<h2>Rinomina sottocategoria</h2><input id="rn" value="${esc(s.n)}"><button class="btn" data-act="dorensub">Salva</button><button class="btn s" data-act="close">Annulla</button>`); }
-  else if (a === "dorensub") { const n = $("#rn").value.trim().toUpperCase(); if (!n) return; $("#dlg").close(); run(() => sb.from("subcategories").update({ name: n }).eq("id", ED.sid).then(chk), "Sottocategoria rinominata"); }
+  else if (a === "rensub") { const s = S.cats.flatMap(c => c.subs).find(x => x.id === id); ED = { sid: id }; pickI = s.i || null; dlg(`<h2>Sottocategoria</h2><label>Nome</label><input id="rn" value="${esc(s.n)}"><label>Icona (facoltativa)</label>${icoGrid(s.i)}<button class="pill" style="margin-top:6px" data-act="subnoicon">Come la categoria</button><button class="btn" data-act="dorensub">Salva</button><button class="btn s" data-act="close">Annulla</button>`); }
+  else if (a === "dorensub") { const n = $("#rn").value.trim().toUpperCase(); if (!n) return; $("#dlg").close(); run(() => sb.from("subcategories").update({ name: n, icon: pickI }).eq("id", ED.sid).then(chk), "Sottocategoria aggiornata"); }
   else if (a === "archsub") { const s = S.cats.flatMap(c => c.subs).find(x => x.id === id); run(() => sb.from("subcategories").update({ archived: !s.arch }).eq("id", id).then(chk), s.arch ? "Ripristinata" : "Archiviata"); }
   else if (a === "archcat") { const c = cat(id); run(() => sb.from("categories").update({ archived: !c.arch }).eq("id", id).then(chk), c.arch ? "Ripristinata" : "Archiviata"); }
   else if (a === "pick") { pick = b.dataset.c; document.querySelectorAll("#sw i").forEach(i => i.classList.toggle("on", i === b)); }
   else if (a === "opencat") { S.openCat = S.openCat === id ? null : id; render(); }
   else if (a === "pickicon") { pickI = b.dataset.k; document.querySelectorAll(".igrid .ig").forEach(i => i.classList.toggle("on", i === b)); }
+  else if (a === "subnoicon") { pickI = null; document.querySelectorAll(".igrid .ig").forEach(i => i.classList.remove("on")); }
   else if (a === "chicon") { const c = cat(id); ED = { cid: id }; pickI = c.i; pick = c.c0; dlg(`<h2>Icona e colore di ${esc(c.n)}</h2>${icoGrid(c.i)}<label>Colore</label>${swatches(c.c0)}<button class="btn" data-act="saveicon">Salva</button><button class="btn s" data-act="close">Annulla</button>`); }
   else if (a === "saveicon") { $("#dlg").close(); run(() => sb.from("categories").update({ icon: pickI, color: pick }).eq("id", ED.cid).then(chk), "Categoria aggiornata"); }
   else if (a === "invite") { const e = $("#pe").value.trim(); const { error } = await sb.rpc("invite_partner", { email: e }); if (error) return toast(error.message.charAt(0).toUpperCase() + error.message.slice(1)); await loadProfile(); render(); toast("Invito inviato"); }

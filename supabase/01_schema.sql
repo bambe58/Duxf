@@ -45,7 +45,8 @@ create table public.subcategories (
   id uuid primary key default gen_random_uuid(),
   household_id uuid not null default public.my_household() references public.households(id) on delete cascade,
   category_id uuid not null references public.categories(id) on delete cascade,
-  name text not null, archived boolean not null default false, created_at timestamptz not null default now()
+  name text not null, icon text,  -- icona facoltativa: se manca vale quella della categoria
+  archived boolean not null default false, created_at timestamptz not null default now()
 );
 create table public.recurrences (
   id uuid primary key default gen_random_uuid(),
@@ -289,8 +290,8 @@ begin
   delete from subcategories where household_id = hid; delete from categories where household_id = hid; delete from year_settings where household_id = hid;
   insert into categories(id, household_id, name, color, icon, archived, created_at)
     select id, hid, name, coalesce(color, '#7b8099'), coalesce(icon, 'altro'), coalesce(archived, false), coalesce(created_at, now()) from jsonb_populate_recordset(null::categories, coalesce(payload->'categories', '[]'));
-  insert into subcategories(id, household_id, category_id, name, archived, created_at)
-    select id, hid, category_id, name, coalesce(archived, false), coalesce(created_at, now()) from jsonb_populate_recordset(null::subcategories, coalesce(payload->'subcategories', '[]'));
+  insert into subcategories(id, household_id, category_id, name, icon, archived, created_at)
+    select id, hid, category_id, name, icon, coalesce(archived, false), coalesce(created_at, now()) from jsonb_populate_recordset(null::subcategories, coalesce(payload->'subcategories', '[]'));
   insert into recurrences(id, household_id, freq, anchor_date, active, created_at)
     select id, hid, freq, anchor_date, coalesce(active, true), coalesce(created_at, now()) from jsonb_populate_recordset(null::recurrences, coalesce(payload->'recurrences', '[]'));
   insert into transactions(id, household_id, kind, amount_cents, tx_date, category_id, subcategory_id, payer, payee, note, rec_id, created_at)
