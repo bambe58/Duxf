@@ -384,9 +384,8 @@ const swatches = cur => `<div class="sw" id="sw">${CATCOL.map(c => `<i data-act=
 let SK = "classico";
 try { SK = localStorage.getItem("duofin.skin.last") || "classico"; } catch (_) { }
 if (!SKINS.some(s => s.id === SK)) SK = "classico";
-function skinColors() {   // in un tema i colori delle categorie seguono la palette del tema (nel database restano quelli scelti)
-  const p = (SKINS.find(s => s.id === SK) || SKINS[0]).pal;
-  S.cats.forEach((c, i) => { c.c = p ? p[i % p.length] : c.c0; });
+function skinColors() {   // i colori delle categorie restano quelli scelti, in ogni tema
+  S.cats.forEach(c => { c.c = c.c0; });
 }
 function applySkin(id, save) {
   SK = id; const p = (SKINS.find(s => s.id === id) || SKINS[0]).pal;
