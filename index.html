@@ -889,7 +889,7 @@ function sett() {
  <div style="display:flex;gap:6px;margin-top:6px"><input data-sub="${c.id}" placeholder="Nuova sottocategoria"><button class="pill" data-act="addsub" data-id="${c.id}">Aggiungi</button></div></div>` : ""}</div>`; }).join("")}
  <button class="btn s" data-act="newcat">＋ Nuova categoria</button>
  <div class="mu" style="margin-top:8px">Le categorie archiviate non compaiono nelle nuove spese ma restano nello storico.</div></div>
- <div class="card"><h2>Dati</h2><button class="btn s" style="margin-top:0" data-act="csvall">Esporta tutte le movimentazioni (CSV)</button><button class="btn s" data-act="csv">Esporta solo il ${y} (CSV)</button><button class="btn s" data-act="log">Registro modifiche</button>
+ <div class="card"><h2>Dati</h2><button class="btn s" style="margin-top:0" data-act="csvall">Esporta tutte le movimentazioni (CSV)</button><button class="btn s" data-act="csv">Esporta solo il ${y} (CSV)</button><button class="btn s" data-act="import">Importa movimenti da Excel</button><button class="btn s" data-act="log">Registro modifiche</button>
 <button class="btn s" data-act="backup">Backup completo (.json)</button><button class="btn s" data-act="restore">Ripristina da backup</button>
  <button class="btn s" data-act="drive">Backup su Google Drive</button><button class="btn s" data-act="driverestore">Ripristina da Google Drive</button>
  <div class="mu" style="margin-top:6px">${drvLast() ? `Ultimo backup su Drive: ${fdt(drvLast())}.` : "Nessun backup su Drive fatto da questo dispositivo."}</div></div>
@@ -1113,6 +1113,100 @@ function download(name, text, mime) {
 }
 // salva il file preparato nel dispositivo
 function saveBlob(d) { const u = URL.createObjectURL(new Blob([d.text], { type: d.mime })), a = document.createElement("a"); a.href = u; a.download = d.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
+/* ---------------- import da Excel ---------------- */
+let xLib = null, IMP = null;
+const IMP_COLS = ["data_movimento", "tipologia", "utente", "importo", "categoria", "sottocategoria", "note"];
+// la libreria Excel si scarica solo quando serve
+const xlsxLoad = () => window.XLSX ? Promise.resolve() : (xLib || (xLib = new Promise((ok, ko) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = ok; s.onerror = () => { xLib = null; ko(new Error("Libreria Excel non raggiungibile")); }; document.head.appendChild(s); })));
+const nrm = s => String(s == null ? "" : s).trim().toLowerCase().replace(/\s+/g, " ");
+const cell = v => String(v == null ? "" : v).trim();
+// data da numero seriale di Excel oppure da testo gg/mm/aaaa o aaaa-mm-gg
+function impDate(v) {
+  let y, m, d, g;
+  if (typeof v === "number" && v > 20000 && v < 80000) { const t = new Date(Math.round(v * 86400000) + Date.UTC(1899, 11, 30)); y = t.getUTCFullYear(); m = t.getUTCMonth() + 1; d = t.getUTCDate(); }
+  else {
+    const s = cell(v);
+    if ((g = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) { y = +g[1]; m = +g[2]; d = +g[3]; }
+    else if ((g = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/))) { d = +g[1]; m = +g[2]; y = +g[3]; if (y < 100) y += 2000; }
+    else return null;
+  }
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d && y >= 2000 && y <= 2100 ? y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0") : null;
+}
+// importo: numero, oppure testo come "1.234,56 €"
+function impAmt(v) {
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  let s = cell(v).replace(/[€\s]/g, ""); if (!s) return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  return /^-?\d+(\.\d+)?$/.test(s) ? parseFloat(s) : null;
+}
+// controlla tutte le righe del foglio e prepara cosa inserire
+function impParse(grid) {
+  const hdr = (grid[0] || []).map(h => nrm(h).replace(/ /g, "_")), ix = {}, miss = IMP_COLS.filter(c => !hdr.includes(c));
+  if (miss.length) return { fatal: "Nella prima riga mancano le colonne: " + miss.join(", ") + "." };
+  IMP_COLS.forEach(c => ix[c] = hdr.indexOf(c));
+  const users = { "conto comune": "J", extra: "E" }; users[nrm(NAMES.J)] = "J"; users[nrm(NAMES.M)] = "M"; users[nrm(NAMES.F)] = "F";
+  const cats = new Map();
+  S.cats.slice().sort((a, b) => (a.arch ? 1 : 0) - (b.arch ? 1 : 0)).forEach(c => {
+    const k = nrm(c.n); if (cats.has(k)) return;
+    const o = { name: c.n, id: c.id, subs: new Map() };
+    c.subs.slice().sort((a, b) => (a.arch ? 1 : 0) - (b.arch ? 1 : 0)).forEach(s => { const sk = nrm(s.n); if (!o.subs.has(sk)) o.subs.set(sk, { name: s.n, id: s.id }); });
+    cats.set(k, o);
+  });
+  const rows = [], errs = [];
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i], g = c => r[ix[c]], bad = t => errs.push("Riga " + (i + 1) + ": " + t);
+    if (r.every(c => cell(c) === "")) continue;
+    const d = impDate(g("data_movimento")); if (!d) { bad("data non valida"); continue; }
+    const tp = { spesa: "s", uscita: "s", versamento: "v", entrata: "v" }[nrm(g("tipologia"))]; if (!tp) { bad("tipologia deve essere spesa o versamento"); continue; }
+    const who = users[nrm(g("utente"))]; if (!who) { bad("utente «" + cell(g("utente")) + "» non riconosciuto"); continue; }
+    if (tp === "s" && who === "E") { bad("Extra vale solo per i versamenti"); continue; }
+    if (tp === "v" && who === "J") { bad("un versamento non può essere del conto comune"); continue; }
+    const a = impAmt(g("importo")); if (!(a > 0)) { bad("importo non valido (deve essere maggiore di zero)"); continue; }
+    const note = cell(g("note"));
+    if (who === "E" && !note) { bad("per Extra la nota è obbligatoria (chi versa)"); continue; }
+    let ck = "", sk = "";
+    if (tp === "s") {
+      const cn = cell(g("categoria")), sn = cell(g("sottocategoria")) || "Generale";
+      if (!cn) { bad("categoria mancante"); continue; }
+      ck = nrm(cn); sk = nrm(sn);
+      if (!cats.has(ck)) cats.set(ck, { name: cn, id: null, subs: new Map() });
+      const o = cats.get(ck); if (!o.subs.has(sk)) o.subs.set(sk, { name: sn, id: null });
+    }
+    rows.push({ tp, who, a: Math.round(a * 100), d, note, ck, sk });
+  }
+  return { rows, errs, cats };
+}
+// crea le categorie mancanti e inserisce i movimenti a blocchi
+async function impRun() {
+  const { rows, cats } = IMP;
+  for (const c of cats.values()) {
+    if (!c.id) c.id = chk(await sb.from("categories").insert({ name: c.name }).select().single()).data.id;
+    for (const s of c.subs.values()) if (!s.id) s.id = chk(await sb.from("subcategories").insert({ category_id: c.id, name: s.name }).select().single()).data.id;
+  }
+  const tx = rows.map(r => ({ kind: r.tp === "s" ? "spesa" : "versamento", amount_cents: r.a, tx_date: r.d, category_id: r.tp === "s" ? cats.get(r.ck).id : null, subcategory_id: r.tp === "s" ? cats.get(r.ck).subs.get(r.sk).id : null, payer: r.who, payee: null, note: r.note }));
+  for (let i = 0; i < tx.length; i += 200) chk(await sb.from("transactions").insert(tx.slice(i, i + 200)));
+}
+// file Excel di esempio con le colonne giuste
+async function impTemplate() {
+  await xlsxLoad();
+  const c0 = S.cats.find(c => !c.arch && c.subs.some(s => !s.arch)), s0 = c0 && c0.subs.find(s => !s.arch), td = new Date().toISOString().slice(0, 10);
+  const ws = XLSX.utils.aoa_to_sheet([IMP_COLS,
+    [td, "spesa", NAMES.F, 45.5, c0 ? c0.n : "Spesa", s0 ? s0.n : "Supermercato", "Esempio: spesa settimanale"],
+    [td, "versamento", NAMES.M, 300, "", "", "Quota del mese"],
+    [td, "versamento", "Extra", 100, "", "", "Regalo nonna"]]);
+  ws["!cols"] = [14, 12, 16, 10, 18, 18, 30].map(w => ({ wch: w }));
+  const info = XLSX.utils.aoa_to_sheet([["Come compilare il foglio Movimenti"], [""],
+    ["data_movimento: gg/mm/aaaa oppure aaaa-mm-gg"], ["tipologia: spesa oppure versamento"],
+    ["utente: " + NAMES.F + ", " + NAMES.M + ", " + NAMES.J + " (solo spese) oppure Extra (solo versamenti)"],
+    ["importo: numero maggiore di zero (es. 45,50)"], ["categoria e sottocategoria: obbligatorie per le spese; se mancano nell'app vengono create; la sottocategoria vuota diventa Generale"],
+    ["note: facoltativa, ma obbligatoria per Extra (scrivi chi versa)"], ["Cancella le righe di esempio prima di importare."]]);
+  info["!cols"] = [{ wch: 100 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Movimenti"); XLSX.utils.book_append_sheet(wb, info, "Istruzioni");
+  const blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), u = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = u; a.download = "duofin-modello-movimenti.xlsx"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000);
+}
+
 const CSVH = "data;anno;mese;tipo;categoria;sottocategoria;pagante;importo;importo_con_segno;nota;destinatario";
 function csv(y) {   // y = anno, oppure null per tutte le movimentazioni
   const q = v => '"' + String(v).replace(/"/g, '""') + '"', n = v => v.toFixed(2).replace(".", ",");
@@ -1330,6 +1424,32 @@ document.addEventListener("click", async e => {
   else if (a === "log") loadLog(false);
   else if (a === "logmore") loadLog(true);
   else if (a === "csv") download("duofin-movimenti-" + S.year + ".csv", csv(S.year), "text/csv;charset=utf-8");
+  else if (a === "import") dlg(`<h2>Importa movimenti da Excel</h2><div class="mu">File .xlsx con la prima riga: <b>${IMP_COLS.join(", ")}</b>. Tipologia: spesa o versamento. Utente: ${esc(NAMES.F)}, ${esc(NAMES.M)}, ${esc(NAMES.J)} (solo spese) o Extra (solo versamenti, con la nota obbligatoria).</div>
+  <label>File Excel</label><input id="xf" type="file" accept=".xlsx,.xls"><div class="mu" id="xm" style="margin-top:8px;min-height:16px"></div>
+  <button class="btn" data-act="xread">Leggi il file</button><button class="btn s" data-act="xtempl">Scarica il modello Excel</button><button class="btn s" data-act="close">Annulla</button>`);
+  else if (a === "xtempl") { try { await impTemplate(); } catch (er) { toast(er.message || "Errore"); } }
+  else if (a === "xread") {
+    const f = $("#xf").files[0], er = t => { const m = $("#xm"); m.textContent = t; m.style.color = "#e5484d"; };
+    if (!f) return er("Scegli il file Excel.");
+    try {
+      await xlsxLoad();
+      const wb = XLSX.read(await f.arrayBuffer(), { type: "array" }), grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" });
+      if (grid.length > 5001) return er("Troppe righe: al massimo 5000 per volta.");
+      const R = impParse(grid); if (R.fatal) return er(R.fatal);
+      IMP = R; const nS = R.rows.filter(r => r.tp === "s"), nV = R.rows.filter(r => r.tp === "v"), tot = l => eur2(sum(l.map(r => r.a / 100)));
+      const nc = [...R.cats.values()].filter(c => !c.id).map(c => c.name), ns = [...R.cats.values()].filter(c => c.id).flatMap(c => [...c.subs.values()].filter(s => !s.id).map(s => c.name + " › " + s.name));
+      dlg(`<h2>Anteprima importazione</h2><div class="mu">${R.rows.length} movimenti pronti: ${nS.length} spese (${tot(nS)}) e ${nV.length} versamenti (${tot(nV)}).</div>
+      ${nc.length || ns.length ? `<div class="mu" style="margin-top:8px"><b>Verranno create:</b> ${[...nc.map(x => "categoria " + x), ...ns.map(x => "sottocategoria " + x)].map(esc).join(", ")}.</div>` : ""}
+      ${R.errs.length ? `<div class="mu" style="margin-top:8px;color:#e5484d"><b>${R.errs.length} righe saltate:</b><br>${R.errs.slice(0, 8).map(esc).join("<br>")}${R.errs.length > 8 ? "<br>…" : ""}</div>` : ""}
+      <div class="mu" style="margin-top:8px">Importare due volte lo stesso file duplica i movimenti.</div>
+      ${R.rows.length ? `<button class="btn" data-act="xdo">Importa ${R.rows.length} movimenti</button>` : ""}<button class="btn s" data-act="close">Annulla</button>`);
+    } catch (e) { er(e.message || "File non leggibile"); }
+  }
+  else if (a === "xdo") {
+    const n = IMP.rows.length, yy = Math.max(...IMP.rows.map(r => +r.d.slice(0, 4)));
+    $("#dlg").close(); toast("Importazione in corso…"); S.year = yy;
+    run(() => impRun(), n + " movimenti importati");
+  }
   else if (a === "csvall") download("duofin-movimenti-completi-" + new Date().toISOString().slice(0, 10) + ".csv", csv(null), "text/csv;charset=utf-8");
   else if (a === "backup") { try { await backup(); toast("Backup scaricato"); } catch (er) { toast("Errore: " + er.message); } }
   else if (a === "drive") { toast("Backup su Drive in corso…"); try { await driveBackup(); render(); toast("Backup salvato su Google Drive"); } catch (er) { toast(er.message); } }
