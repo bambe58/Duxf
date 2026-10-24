@@ -890,7 +890,7 @@ function sett() {
  <button class="btn s" data-act="newcat">＋ Nuova categoria</button>
  <div class="mu" style="margin-top:8px">Le categorie archiviate non compaiono nelle nuove spese ma restano nello storico.</div></div>
  <div class="card"><h2>Dati</h2><button class="btn s" style="margin-top:0" data-act="csvall">Esporta tutte le movimentazioni (CSV)</button><button class="btn s" data-act="csv">Esporta solo il ${y} (CSV)</button><button class="btn s" data-act="import">Importa movimenti da Excel</button><button class="btn s" data-act="log">Registro modifiche</button>
-<button class="btn s" data-act="backup">Backup completo (.json)</button><button class="btn s" data-act="restore">Ripristina da backup</button>
+<button class="btn s" data-act="backup">Backup completo (.json)</button><button class="btn s" data-act="restore">Ripristina da backup</button><button class="btn d" data-act="wipe">Cancella tutti i dati</button>
  <button class="btn s" data-act="drive">Backup su Google Drive</button><button class="btn s" data-act="driverestore">Ripristina da Google Drive</button>
  <div class="mu" style="margin-top:6px">${drvLast() ? `Ultimo backup su Drive: ${fdt(drvLast())}.` : "Nessun backup su Drive fatto da questo dispositivo."}</div></div>
  <div class="card"><h2>Sicurezza</h2><button class="btn s" style="margin-top:0" data-act="biotoggle">${bioOn ? "Disattiva" : "Attiva"} sblocco con Face ID / impronta</button>
@@ -1476,6 +1476,21 @@ document.addEventListener("click", async e => {
       const { error } = await sb.rpc("restore_backup", { pw: $("#rp").value, payload }); if (error) return err(error.message.includes("non impostata") ? "Password di ripristino non impostata." : error.message.includes("password") ? "Password errata." : "Errore: " + error.message);
       armed = false; $("#dlg").close(); await loadAll(); render(); toast("Backup ripristinato");
     } catch (_) { err("File non valido."); }
+  }
+  else if (a === "wipe") dlg(`<h2>Cancella tutti i dati</h2><div class="mu">Cancella <b>per tutta la famiglia</b> movimenti, ricorrenze e quote mensili. L'operazione non si può annullare: prima fai un backup.</div>
+  <label class="ck" style="margin-top:10px"><input type="checkbox" id="wc2">Cancella anche categorie e sottocategorie</label>
+  <label>Password di ripristino backup</label><input id="wp" type="password" autocomplete="off">
+  <div class="mu" id="wm" style="margin-top:8px">${P.has_pw ? "Servono due tocchi su Cancella per confermare." : "Prima imposta la password di ripristino in Impostazioni › Sicurezza."}</div>
+  <button class="btn d" data-act="dowipe">Cancella tutto</button><button class="btn s" data-act="close">Annulla</button>`);
+  else if (a === "dowipe") {
+    const err = t => { $("#wm").textContent = t; $("#wm").style.color = "#e5484d"; armed = false; b.textContent = "Cancella tutto"; };
+    if (!$("#wp").value) return err("Inserisci la password.");
+    if (!armed) { armed = true; b.textContent = "Conferma cancellazione"; return; }
+    try {
+      const { error } = await sb.rpc("delete_all_data", { pw: $("#wp").value, with_cats: $("#wc2").checked });
+      if (error) return err(error.message.includes("non impostata") ? "Password di ripristino non impostata." : error.message.includes("password") ? "Password errata." : "Errore: " + error.message);
+      armed = false; $("#dlg").close(); await loadAll(); render(); toast("Dati cancellati");
+    } catch (e) { err("Errore: " + (e.message || e)); }
   }
   else if (a === "biotoggle") { if (localStorage.getItem("casa.bio")) { localStorage.removeItem("casa.bio"); toast("Sblocco biometrico disattivato"); render(); } else bioEnable(); }
   else if (a === "bio-unlock") bioUnlock();
