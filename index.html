@@ -293,8 +293,8 @@ const $ = s => document.querySelector(s), sum = a => a.reduce((s, x) => s + x, 0
 const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 const MESI_L = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const MESI = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
-const NAMES = { F: "Tu", M: "Partner", J: "Conto comune" }, COL = { F: "var(--F)", M: "var(--M)", J: "var(--J)" };
-const HEX = { F: "#3d6bff", M: "#ff4f9a", J: "#12b5a0" };
+const NAMES = { F: "Tu", M: "Partner", J: "Conto comune", E: "Extra" }, COL = { F: "var(--F)", M: "var(--M)", J: "var(--J)", E: "#f59e0b" };
+const HEX = { F: "#3d6bff", M: "#ff4f9a", J: "#12b5a0", E: "#f59e0b" };
 const NOW = new Date(), CY = NOW.getFullYear(), CM = NOW.getMonth();
 const eur = n => Math.round(n).toLocaleString("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 const eur2 = n => n.toLocaleString("it-IT", { style: "currency", currency: "EUR" });
@@ -459,7 +459,7 @@ function Y(y, cin) {
   const t = S.tx.filter(x => +x.d.slice(0, 4) === y), sp = t.filter(x => x.k === "s"), vr = t.filter(x => x.k === "v");
   const am = a => sum(a.map(x => x.a)), spent = am(sp), open = y >= CY, cd = open ? Math.max(1, CM) : 12;
   const pk = { F: am(sp.filter(x => x.who === "F")), M: am(sp.filter(x => x.who === "M")) }, jt = am(sp.filter(x => x.who === "J"));
-  const vs = { F: am(vr.filter(x => x.who === "F")), M: am(vr.filter(x => x.who === "M")) };
+  const vs = { F: am(vr.filter(x => x.who === "F")), M: am(vr.filter(x => x.who === "M")) }, ex = am(vr.filter(x => x.who === "E"));   // ex = versamenti Extra (da terzi)
   // trasferimenti: tra utenti spostano credito (il totale non cambia); dal conto comune a un utente e' l'opposto di un versamento
   t.filter(x => x.k === "t").forEach(x => { if (x.who === "J") vs[x.to] -= x.a; else { vs[x.who] -= x.a; vs[x.to] += x.a; } });
   const mo = (a, m) => a.filter(x => +x.d.slice(5, 7) === m + 1);
@@ -470,15 +470,15 @@ function Y(y, cin) {
     const prev = S.tx.filter(x => x.k === "s" && +x.d.slice(0, 4) === y - 1), avg = spent / cd;
     for (let m = cd; m < 12; m++) proj += prev.length ? .5 * avg + .5 * am(mo(prev, m)) : avg;
   }
-  const Q = quotaOf(y), integr = Math.max(0, proj / 2 - 12 * Q), c = { F: vs.F + pk.F, M: vs.M + pk.M };
+  const Q = quotaOf(y), integr = Math.max(0, (proj - ex) / 2 - 12 * Q), c = { F: vs.F + pk.F, M: vs.M + pk.M };
   const dov = {}, cred = {};
   ["F", "M"].forEach(p => {
     const sf = Math.max(0, Q * cd - c[p]); // conguaglio per portare chi e' sotto alla quota minima
     const ex = Math.max(0, c[p] - Q * cd) + cin[p];
     dov[p] = sf + Math.max(0, integr - ex); cred[p] = Math.max(0, ex - integr);
   });
-  const ent = c.F + c.M + cin.F + cin.M + 2 * Q * (12 - cd); // entrate stimate a fine anno: versato finora + quota sui mesi rimanenti
-  return { y, spent, pk, vs, c, spM, vrM, proj, Q, integr, dov, cred, cin, ent, delta: ent - proj, rec: Q + integr / 12, saldo: vs.F + vs.M - jt, open, cd, credNext: cred };
+  const ent = c.F + c.M + ex + cin.F + cin.M + 2 * Q * (12 - cd); // entrate stimate a fine anno: versato finora + quota sui mesi rimanenti
+  return { y, spent, pk, vs, c, spM, vrM, proj, Q, integr, dov, cred, cin, ent, delta: ent - proj, rec: Q + integr / 12, saldo: vs.F + vs.M + ex - jt, ex, open, cd, credNext: cred };
 }
 // Y con cache: calcola gli anni in ordine cosi' il credito di fine anno passa a quello dopo
 function YD(y) {
@@ -575,7 +575,7 @@ function moves() {
   const tp = [["", "Tutti"], ["s", "Spese"], ["v", "Versamenti"], ["t", "Trasferimenti"], ["r", "Ricorrenti"]];
   const panel = S.mfo ? `<div class="mfp"><div class="frow" style="margin-top:4px">${tp.map(([v, l]) => `<button class="pill ${S.mt === v ? "on" : ""}" data-act="mtype" data-v="${v}">${l}</button>`).join("")}</div>
    <div class="two" style="margin-top:8px"><div><label for="mfc" style="margin-top:0">Categoria</label><select id="mfc">${opt("", S.mc, "Tutte")}${S.cats.map(c => opt(c.id, S.mc, esc(c.n))).join("")}</select></div>
-   <div><label for="mfw" style="margin-top:0">Pagatore</label><select id="mfw">${opt("", S.mw, "Tutti")}${["F", "M", "J"].map(p => opt(p, S.mw, esc(NAMES[p]))).join("")}</select></div></div>
+   <div><label for="mfw" style="margin-top:0">Pagatore</label><select id="mfw">${opt("", S.mw, "Tutti")}${["F", "M", "J", "E"].map(p => opt(p, S.mw, esc(NAMES[p]))).join("")}</select></div></div>
    <div class="two" style="margin-top:4px"><div><label for="mfa">Importo da (€)</label><input id="mfa" type="number" inputmode="decimal" value="${esc(S.amin)}"></div><div><label for="mfb">a (€)</label><input id="mfb" type="number" inputmode="decimal" value="${esc(S.amax)}"></div></div>
    <label class="ck" style="margin-top:8px;padding:6px 0;border:0"><input type="checkbox" id="mfall" ${S.mall ? "checked" : ""}>Cerca in tutti gli anni</label>
    ${n ? `<button class="btn s" data-act="mreset" style="margin-top:8px">Azzera i filtri</button>` : ""}</div>` : "";
@@ -933,7 +933,7 @@ function openForm(id) {
   ED = x ? { ...x } : { id: null, k: "s", a: "", d: new Date().toISOString().slice(0, 10), cat: c0.id, sub: c0.subs.find(s => !s.arch).id, who: "J", note: "" };
   dlg(`<h2 style="margin:0 0 4px">${ED.k === "s" ? "Modifica spesa" : ED.k === "t" ? "Modifica trasferimento" : "Modifica versamento"}</h2><label>Importo (€)</label><input id="fa" type="number" step="0.01" inputmode="decimal" value="${ED.a}">
  <label>Data</label><input id="fd" type="date" value="${ED.d}"><div id="fc"></div><label id="wl"></label><div class="seg" id="sw2"></div>${ED.k === "t" ? `<label id="wl2">A</label><div class="seg" id="sw3"></div>` : ""}
- <label>Nota (facoltativa)</label><input id="fn" value="${esc(ED.note)}">
+ <label id="nl">Nota (facoltativa)</label><input id="fn" value="${esc(ED.note)}">
  ${ED.k === "t" ? "" : (() => { const r = ED.rec ? S.rec[ED.rec] : null, on = !!(r && r.active); return `<div class="rrow"><label class="ck"><input type="checkbox" id="frc" ${on ? "checked" : ""}>Ricorrente</label><select id="ffr" aria-label="Frequenza" ${on ? "" : "disabled"}>${Object.entries(FRQ).map(([k, v]) => `<option value="${k}" ${k === (r ? r.freq : "m") ? "selected" : ""}>${v}</option>`).join("")}</select></div>
  <div class="mu" style="font-size:12px">${r ? (on ? "Spunta tolta = la ricorrenza termina e lo storico resta. I prossimi movimenti copiano l'ultimo della serie." : "Ricorrenza terminata. Rimetti la spunta per riattivarla.") : "Con la spunta, un movimento identico viene aggiunto in automatico a ogni scadenza."}</div>`; })()}<button class="btn" data-act="save">Salva</button>
  ${x ? `<button class="btn d" data-act="del">Elimina</button>` : ""}<button class="btn s" data-act="close">Annulla</button>`);
@@ -942,9 +942,11 @@ function openForm(id) {
 // disegna il modulo di modifica dentro il popup
 function drawForm() {
   if (ED.k === "v" && ED.who === "J") ED.who = "F";
+  if (ED.k !== "v" && ED.who === "E") ED.who = "J";
   if (ED.k === "t") ED.to = ED.who === "F" ? "M" : ED.who === "M" ? "F" : (ED.to === "M" ? "M" : "F");   // tra utenti la destinazione e' l'altro utente
   $("#wl").textContent = ED.k === "s" ? "Pagato da" : ED.k === "t" ? "Da" : "Versato da";
-  seg($("#sw2"), (ED.k === "v" ? ["F", "M"] : ["F", "M", "J"]).map(p => [p, NAMES[p], HEX[p]]), ED.who, "who");
+  seg($("#sw2"), (ED.k === "v" ? ["F", "M", "E"] : ["F", "M", "J"]).map(p => [p, NAMES[p], HEX[p]]), ED.who, "who");
+  { const nl = $("#nl"); if (nl) nl.textContent = ED.who === "E" ? "Nota (obbligatoria: scrivi chi versa)" : "Nota (facoltativa)"; }
   if (ED.k === "t") seg($("#sw3"), (ED.who === "J" ? ["F", "M"] : [ED.to]).map(p => [p, NAMES[p], HEX[p]]), ED.to, "to");
   const cats = S.cats.filter(c => !c.arch || c.id === ED.cat), cur = cat(ED.cat), subs = cur.subs.filter(s => !s.arch || s.id === ED.sub);
   $("#fc").innerHTML = ED.k === "s" ? `<label>Categoria</label><select id="fcat">${cats.map(c => `<option value="${c.id}" ${c.id === ED.cat ? "selected" : ""}>${esc(c.n)}</option>`).join("")}</select>
@@ -993,7 +995,7 @@ function wDraw() {
   let body = "";
   if (W.step === "amt") {
     const z = Math.min(vw, 330), cx = z / 2, cy = z * .53, d = z * .27, R = z * .37, cd = z * .34, len = wAmtTxt().length + 2;
-    const WH = SK === "blu" ? { F: "#ffffff", M: "#ffd54a", J: "#7fffd4" } : HEX, who = [["J", WH.J], ["M", WH.M], ["F", WH.F]].map(([p, c]) => ({ n: NAMES[p], c, who: true, act: "wwho", p, dis: W.kind === "v" && p === "J" }));
+    const WH = SK === "blu" ? { F: "#ffffff", M: "#ffd54a", J: "#7fffd4", E: "#ffb74d" } : HEX, who = [[W.kind === "v" ? "E" : "J", W.kind === "v" ? WH.E : WH.J], ["M", WH.M], ["F", WH.F]].map(([p, c]) => ({ n: NAMES[p], c, who: true, act: "wwho", p }));
     const fs = Math.max(15, Math.min(30, cd * .8 / (len * .56)));
     body = `<div class="wst" style="width:${z}px;height:${z * .88}px">${wBubs(who, z, cx, cy, R, d)}${wCenter(z, cx, cy, cd, `<b style="font-size:${fs}px">${esc(wAmtTxt())} €</b><span class="mu">${WL[W.kind]}</span>`)}</div>
     <div class="wtype"><button class="${W.kind === "s" ? "on" : ""}" data-act="wtype" data-v="s"><span class="cb">✓</span>Spesa</button><button class="${W.kind === "v" ? "on" : ""}" data-act="wtype" data-v="v"><span class="cb">✓</span>Versamento</button><button class="${W.kind === "t" ? "on" : ""}" data-act="wtype" data-v="t"><span class="cb">✓</span>Trasferimento</button></div>
@@ -1030,14 +1032,14 @@ function wDraw() {
       <button class="wback" data-act="wback">← indietro</button>`;
     }
   } else {
-    const c = W.kind === "s" ? cat(W.cat) : null, sn = W.kind === "s" ? subN(W.cat, W.sub) : "", hx = p => SK === "blu" ? { F: "#ffffff", M: "#ffd54a", J: "#7fffd4" }[p] : HEX[p];
+    const c = W.kind === "s" ? cat(W.cat) : null, sn = W.kind === "s" ? subN(W.cat, W.sub) : "", hx = p => SK === "blu" ? { F: "#ffffff", M: "#ffd54a", J: "#7fffd4", E: "#ffb74d" }[p] : HEX[p];
     body = `<div class="wsum">
      <button class="wr" data-act="wgo" data-s="amt"><span>Importo</span><b style="font-size:20px">${wFmt(wAmtNum())}</b></button>
      <button class="wr" data-act="wgo" data-s="amt"><span>${W.kind === "s" ? "Pagato da" : W.kind === "t" ? "Da" : "Versato da"}</span><b style="color:${hx(W.who)}">${esc(NAMES[W.who])}</b></button>
      ${W.kind === "t" ? `<button class="wr" data-act="wgo" data-s="${W.who === "J" ? "to" : "amt"}" ${W.who === "J" ? "" : "disabled style=\"cursor:default\""}><span>A</span><b style="color:${hx(W.to)}">${esc(NAMES[W.to])}</b></button>` : ""}
      ${W.kind === "s" ? `<button class="wr" data-act="wgo" data-s="cat"><span>Categoria</span><b>${esc(c.n)} › ${esc(sn)}</b></button>` : ""}
      <label class="wr" style="cursor:pointer"><span>Data</span><input id="wdt" type="date" value="${W.d}"></label>
-     <label class="wr" style="cursor:pointer"><span>Nota</span><input id="wnt" value="${esc(W.note)}" placeholder="facoltativa"></label>
+     <label class="wr" style="cursor:pointer"><span>Nota</span><input id="wnt" value="${esc(W.note)}" placeholder="${W.who === "E" ? "obbligatoria: scrivi chi versa" : "facoltativa"}"></label>
      ${W.kind === "t" ? "" : `<div class="wr" style="cursor:default"><label class="ck" style="padding:0;border:0"><input type="checkbox" id="wrc" ${W.rec ? "checked" : ""}>Ricorrente</label><select id="wfr" aria-label="Frequenza" style="width:auto;padding:8px 10px" ${W.rec ? "" : "disabled"}>${Object.entries(FRQ).map(([k, v]) => `<option value="${k}" ${k === W.freq ? "selected" : ""}>${v}</option>`).join("")}</select></div>`}</div>
      <button class="btn" data-act="wsave">Salva</button>
      <button class="wback" data-act="wgo" data-s="${W.kind === "s" ? "cat" : "amt"}">← indietro</button>`;
@@ -1226,14 +1228,16 @@ document.addEventListener("click", async e => {
   else if (a === "wclose") wClose();
   else if (a === "wkey") { wSetAmt(b.dataset.k); wUpdAmt(); }
   else if (a === "wtype") {   // cambia solo il tipo: i cerchi non si ridisegnano, COI si barra nei versamenti
-    W.kind = b.dataset.v; W.to = null; if (W.kind === "v" && W.who === "J") W.who = null;
+    W.kind = b.dataset.v; W.to = null; if ((W.kind === "v" && W.who === "J") || (W.kind !== "v" && W.who === "E")) W.who = null;
     document.querySelectorAll(".wtype button").forEach(x => x.classList.toggle("on", x.dataset.v === W.kind));
-    const j = document.querySelector('#wheel .bub[data-p="J"]'); if (j) j.toggleAttribute("disabled", W.kind === "v");
+    const j = document.querySelector('#wheel .bub[data-p="J"], #wheel .bub[data-p="E"]');   // nei versamenti il cerchio del conto comune diventa "Extra"
+    if (j) { const e = W.kind === "v"; j.dataset.p = e ? "E" : "J"; j.setAttribute("aria-label", e ? NAMES.E : NAMES.J); j.querySelector(".bt").textContent = e ? NAMES.E : NAMES.J; j.style.setProperty("--cc", SK === "blu" ? (e ? "#ffb74d" : "#7fffd4") : (e ? HEX.E : HEX.J)); }
     const m = document.querySelector("#wc .mu"); if (m) m.textContent = { s: "importo", v: "versamento", t: "trasferimento" }[W.kind];
     const h = $("#whint"); if (h) h.textContent = { s: "Scrivi l'importo, poi tocca chi ha pagato", v: "Scrivi l'importo, poi tocca chi ha versato", t: "Scrivi l'importo, poi tocca chi trasferisce" }[W.kind];
   }
   else if (a === "wwho") {
     if (W.kind === "v" && b.dataset.p === "J") return;
+    if (W.kind !== "v" && b.dataset.p === "E") return;
     if (!(wAmtNum() > 0)) { const c = $("#wc"); if (c) { c.classList.remove("shake"); void c.offsetWidth; c.classList.add("shake"); } return; }
     W.who = b.dataset.p;
     if (W.kind === "t") {   // tra utenti la destinazione e' l'altro; dal conto comune si sceglie
@@ -1256,6 +1260,7 @@ document.addEventListener("click", async e => {
     const p = { kind: W.kind === "s" ? "spesa" : W.kind === "t" ? "trasferimento" : "versamento", amount_cents: Math.round(wAmtNum() * 100), tx_date: W.d, payer: W.who, payee: W.kind === "t" ? W.to : null, note: W.note.trim(),
       category_id: W.kind === "s" ? W.cat : null, subcategory_id: W.kind === "s" ? W.sub : null };
     if (!(p.amount_cents > 0) || !p.tx_date || (W.kind === "t" && !W.to)) return;
+    if (p.payer === "E" && !p.note) { toast("Scrivi nella nota chi ha versato"); const n = $("#wnt"); if (n) n.focus(); return; }
     const k = W.kind, rec = W.kind !== "t" && W.rec, fr = W.freq; S.year = +p.tx_date.slice(0, 4); wClose();
     run(async () => {
       if (rec) { const r = chk(await sb.from("recurrences").insert({ freq: fr, anchor_date: p.tx_date, active: true }).select().single()); p.rec_id = r.data.id; }
@@ -1270,6 +1275,7 @@ document.addEventListener("click", async e => {
     const p = { kind: ED.k === "s" ? "spesa" : ED.k === "t" ? "trasferimento" : "versamento", amount_cents: Math.round(v * 100), tx_date: $("#fd").value, payer: ED.who, payee: ED.k === "t" ? ED.to : null, note: $("#fn").value.trim(),
       category_id: ED.k === "s" ? $("#fcat").value : null, subcategory_id: ED.k === "s" ? $("#fsub").value : null };
     if (!p.tx_date) return;
+    if (p.payer === "E" && !p.note) { toast("Scrivi nella nota chi ha versato"); $("#fn").focus(); return; }
     $("#dlg").close(); S.year = +p.tx_date.slice(0, 4);
     const wantRec = ED.k !== "t" && $("#frc").checked, fr = ED.k === "t" ? "m" : $("#ffr").value, cur = ED.rec ? S.rec[ED.rec] : null;
     run(async () => {

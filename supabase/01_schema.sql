@@ -62,11 +62,12 @@ create table public.transactions (
   tx_date date not null,
   category_id uuid references public.categories(id) on delete set null,
   subcategory_id uuid references public.subcategories(id) on delete set null,
-  payer text not null check (payer in ('F','M','J')),
+  payer text not null,
   payee text,  -- solo per i trasferimenti: chi riceve
   note text not null default '',
   rec_id uuid references public.recurrences(id) on delete set null,
   created_at timestamptz not null default now(),
+  constraint transactions_payer_check check (payer in ('F','M','J') or (payer = 'E' and kind = 'versamento' and btrim(note) <> '')),
   constraint transactions_payee_check check (case when kind = 'trasferimento' then coalesce(payee in ('F','M') and payee <> payer and rec_id is null, false) else payee is null end)
 );
 create index on public.transactions(household_id, tx_date);
@@ -114,7 +115,7 @@ create function public._fd(d date) returns text language sql immutable as $$ sel
 
 -- nome di chi ha pagato: F/M = membri in ordine di ingresso, J = conto comune
 create function public._who(hid uuid, p text) returns text language sql stable security definer set search_path = public as
-$$ select case p when 'J' then (select joint_name from households where id = hid)
+$$ select case p when 'E' then 'Extra' when 'J' then (select joint_name from households where id = hid)
   else coalesce((select name from (select name, row_number() over (order by joined_at, created_at) rn from profiles where household_id = hid) m where rn = case p when 'F' then 1 else 2 end), 'Partner') end $$;
 
 create function public._dtx(t public.transactions) returns text language sql stable security definer set search_path = public as
