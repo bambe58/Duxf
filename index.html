@@ -7,8 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="manifest" href="/manifest.webmanifest">
-<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#c8553d">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap">
 <style>:root{--bg:#f7f8fc;--card:#fff;--ink:#14162b;--mu:#7b8099;--ln:#e8eaf3;--F:#3d6bff;--M:#ff4f9a;--J:#12b5a0;--warn:#ffb020;
@@ -1598,7 +1597,7 @@ async function start() {
   } catch (e) { toast("Impossibile caricare i dati: " + (e.message || e)); }
 }
 (async () => {
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function(){});
+  if ("serviceWorker" in navigator) void 0;
   const qs = new URLSearchParams(location.hash.replace(/^#/, "") + "&" + location.search.replace(/^\?/, ""));
   if (qs.get("error_description")) { history.replaceState(null, "", location.pathname); showLogin(); $("#lerr").textContent = "Accesso con Google non riuscito."; return; }
   const { data: { session } } = await sb.auth.getSession();
