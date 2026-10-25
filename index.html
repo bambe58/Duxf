@@ -377,7 +377,8 @@ const SKINS = [
   { id: "blu", n: "Progetto blu", d: "Sfondo blu da disegno tecnico, linee tratteggiate e testo a spaziatura fissa.", sw: ["#2a6bb8", "#ffd54a", "#7fffd4"], pal: ["#ffffff", "#ffd54a", "#7fffd4", "#ff8a80", "#b9d4ff", "#ffe9a8", "#9fc4ff", "#c8e1ff"] }
 ];
 const PAL0 = PAL.slice();
-const CATCOL = [...PAL0, "#e5484d", "#2fb344", "#f5d90a", "#9c6b3f", "#2b2f42", "#4aa8ff"];   // colori scelti per una categoria: i soliti piu' rosso, verde, giallo, marrone, nero, azzurro
+const CATCOL = [...PAL0, "#e5484d", "#2fb344", "#f5d90a", "#9c6b3f", "#2b2f42", "#4aa8ff",
+  "#f97316", "#eab308", "#b45309", "#84cc16", "#166534", "#6ee7b7", "#14b8a6", "#38bdf8", "#1e3a8a", "#4338ca", "#6d28d9", "#c4b5fd", "#d946ef", "#fb7185", "#9f1239", "#f9a8d4", "#475569", "#b6bccd"];   // colori scelti per una categoria: i soliti piu' rosso, verde, giallo, marrone, nero, azzurro
 const swatches = cur => `<div class="sw" id="sw">${CATCOL.map(c => `<i data-act="pick" data-c="${c}" class="${c === cur ? "on" : ""}" style="background:${c}"></i>`).join("")}</div>`;
 let SK = "classico";
 try { SK = localStorage.getItem("duofin.skin.last") || "classico"; } catch (_) { }
