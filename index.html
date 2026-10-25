@@ -389,7 +389,7 @@ function applySkin(id, save) {
   SK = id; const p = (SKINS.find(s => s.id === id) || SKINS[0]).pal;
   document.documentElement.dataset.skin = id;
   PAL.splice(0, PAL.length, ...(p || PAL0)); YC = {}; skinColors();
-  try { localStorage.setItem("duofin.skin.last", id); } catch (_) { }
+  try { localStorage.setItem("duofin.skin.last", id); localStorage.setItem("duofin.skin.uid", P.id || ""); } catch (_) { }
   if (save) sb.rpc("set_skin", { skin: id }).then(r => { if (r.error) toast("Tema non salvato: " + r.error.message); });
 }
 document.documentElement.dataset.skin = SK;
@@ -425,7 +425,9 @@ async function loadProfile() {
   const { data, error } = await sb.rpc("get_profile"); if (error) throw error;
   P = data; const m = P.members;
   NAMES.F = m[0] ? m[0].name : "Tu"; NAMES.M = m[1] ? m[1].name : "Partner"; NAMES.J = P.joint || "Conto comune";
-  if (P.skin && P.skin !== SK) applySkin(P.skin, false);
+  let own = ""; try { own = localStorage.getItem("duofin.skin.uid") || ""; } catch (_) { }
+  if (own === P.id && SK !== "classico" && P.skin !== SK) sb.rpc("set_skin", { skin: SK }).then(() => { });   // la scelta fatta su questo telefono non e' ancora sul database: la salvo, senza tornare al Classico
+  else if (P.skin && P.skin !== SK) applySkin(P.skin, false);
   // l'amministratore vede e gestisce le email abilitate (se le funzioni non sono ancora nel database resta tutto nascosto)
   P.admin = false; P.allowed = [];
   const ad = await sb.rpc("is_admin");
