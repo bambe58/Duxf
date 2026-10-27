@@ -58,6 +58,11 @@ h2{font-size:15px;margin:0 0 12px;font-weight:800}
 .tab span{font-size:20px;transition:transform .25s}.tab.on{color:var(--ink)}.tab.on span{transform:translateY(-3px) scale(1.15)}
 .fab{display:grid;place-items:center;padding:0;line-height:0;position:fixed;right:20px;bottom:calc(86px + env(safe-area-inset-bottom,0px));width:58px;height:58px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--F),var(--M));color:#fff;font-size:30px;box-shadow:0 10px 24px rgba(61,107,255,.4);z-index:6;transition:transform .2s}
 .fab:active{transform:scale(.9) rotate(90deg)}
+/* feedback al tocco: il pulsante si rimpicciolisce un attimo (scale si somma agli altri transform) */
+button,[data-act]{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+:root:not([data-skin="bordi"]) button:not(:disabled):active,:root:not([data-skin="bordi"]) [data-act]:active{scale:.95;transition:scale .08s ease-out}
+:root:not([data-skin="bordi"]) .card[data-act]:active,:root:not([data-skin="bordi"]) .row:active,:root:not([data-skin="bordi"]) .skin:active,:root:not([data-skin="bordi"]) .wr:active,:root:not([data-skin="bordi"]) .wlist button:active{scale:.985}
+@media (prefers-reduced-motion:reduce){button:active,[data-act]:active{scale:1!important}}
 .view{animation:fade .3s}@keyframes fade{from{opacity:0;transform:translateY(8px)}}
 .bars{display:flex;align-items:flex-end;gap:5px;height:130px;position:relative}
 .avg{position:absolute;left:0;right:0;border-top:2px dashed var(--warn)}
@@ -907,6 +912,7 @@ function sett() {
  ${P.allowed.map(u => `<div class="mem"><span class="g"><b>${esc(u.email)}</b><div class="mu">${u.is_admin ? "amministratore" : u.registered ? "registrato" : "in attesa del primo accesso"}</div></span>${u.is_admin || u.registered ? "" : `<button class="pill" data-act="allowdel" data-e="${esc(u.email)}">Togli</button>`}</div>`).join("")}
  <label>Abilita una nuova email</label><div class="row2"><input id="ae" type="email" placeholder="nome@email.it" autocomplete="off"><button class="pill on" data-act="allowadd">Abilita</button></div></div>` : "";
   const aspetto = `<div class="card"><h2>Aspetto</h2><div class="mu" style="margin:-4px 0 8px">Vale solo per il tuo account (${esc(me.name || "")}).</div>${SKINS.map(k => `<button class="skin ${k.id === SK ? "on" : ""}" data-act="skin" data-s="${k.id}"><span class="sws">${k.sw.map(c => `<i style="background:${c}"></i>`).join("")}</span><span class="g"><b>${k.n}</b><span class="mu">${k.d}</span></span><span class="chk">${k.id === SK ? "✓" : ""}</span></button>`).join("")}
+ <button class="skin ${HAP ? "on" : ""}" data-act="haptic"><span class="g"><b>Vibrazione al tocco</b><span class="mu">Vibrazione leggera quando salvi o scegli (solo Android)</span></span><span class="chk">${HAP ? "✓" : ""}</span></button>
 </div>`;
   return `<div class="view"><div class="card"><h2>Quota mensile ${y}</h2><label>Versamento mensile a testa (€)</label><input id="q" type="number" value="${quotaOf(y) || ""}" inputmode="decimal">
  ${S.quota[y] === undefined && quotaFrom(y) !== null ? `<div class="mu" style="margin-top:6px">Uguale a quella del ${quotaFrom(y)}. Modificala e salva solo se cambia.</div>` : ""}
@@ -1324,8 +1330,13 @@ document.addEventListener("visibilitychange", () => {
 });
 
 /* ---------------- azioni ---------------- */
+let HAP = true; try { HAP = localStorage.getItem("duofin.haptic") !== "0"; } catch (_) { }
+const BUZZ = new Set(["save", "saveq", "saveicon", "wsave", "wcat", "wsub", "wwho", "wto", "wkey", "wtype", "add", "del", "dowipe"]);
+document.addEventListener("touchstart", () => { }, { passive: true });   // fa funzionare lo stato :active su iPhone
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return; const a = b.dataset.act, id = b.dataset.id;
+  if (HAP && BUZZ.has(a) && navigator.vibrate) navigator.vibrate(a === "del" || a === "dowipe" ? [14, 40, 14] : a === "wkey" ? 6 : 10);
+  if (a === "haptic") { HAP = !HAP; try { localStorage.setItem("duofin.haptic", HAP ? "1" : "0"); } catch (_) { } if (HAP && navigator.vibrate) navigator.vibrate(20); S.still = true; render(); return; }
   if (a === "tipgo") { $("#dlg").close(); S.tab = "stats"; ST.v = "trend"; ST.fc = b.dataset.fc || null; ST.fs = null; render(); window.scrollTo(0, 0); }
   else if (a === "tips") dlg(statsTips());
   else if (a === "mfilt") { S.mfo = !S.mfo; render(); }
