@@ -62,6 +62,8 @@ h2{font-size:15px;margin:0 0 12px;font-weight:800}
 button,[data-act]{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 :root:not([data-skin="bordi"]) button:not(:disabled):active,:root:not([data-skin="bordi"]) [data-act]:active{scale:.95;transition:scale .08s ease-out}
 :root:not([data-skin="bordi"]) .card[data-act]:active,:root:not([data-skin="bordi"]) .row:active,:root:not([data-skin="bordi"]) .skin:active,:root:not([data-skin="bordi"]) .wr:active,:root:not([data-skin="bordi"]) .wlist button:active{scale:.985}
+.bub.hit{scale:.86!important;transition:scale .1s ease-out}
+.wkp button:active{scale:.9!important}
 @media (prefers-reduced-motion:reduce){button:active,[data-act]:active{scale:1!important}}
 .view{animation:fade .3s}@keyframes fade{from{opacity:0;transform:translateY(8px)}}
 .bars{display:flex;align-items:flex-end;gap:5px;height:130px;position:relative}
@@ -1335,7 +1337,9 @@ const BUZZ = new Set(["save", "saveq", "saveicon", "wsave", "wcat", "wsub", "wwh
 document.addEventListener("touchstart", () => { }, { passive: true });   // fa funzionare lo stato :active su iPhone
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return; const a = b.dataset.act, id = b.dataset.id;
-  if (HAP && BUZZ.has(a) && navigator.vibrate) navigator.vibrate(a === "del" || a === "dowipe" ? [14, 40, 14] : a === "wkey" ? 6 : 10);
+  const first = !b.dataset.fired;
+  if (HAP && first && BUZZ.has(a) && navigator.vibrate) navigator.vibrate(a === "del" || a === "dowipe" ? [14, 40, 14] : a === "wkey" ? 6 : 10);
+  if (first && b.classList.contains("bub") && !b.disabled) { b.dataset.fired = "1"; b.classList.add("hit"); setTimeout(() => b.click(), 130); return; }   // le bolle restano rimpicciolite un istante prima di passare al passo dopo
   if (a === "haptic") { HAP = !HAP; try { localStorage.setItem("duofin.haptic", HAP ? "1" : "0"); } catch (_) { } if (HAP && navigator.vibrate) navigator.vibrate(20); S.still = true; render(); return; }
   if (a === "tipgo") { $("#dlg").close(); S.tab = "stats"; ST.v = "trend"; ST.fc = b.dataset.fc || null; ST.fs = null; render(); window.scrollTo(0, 0); }
   else if (a === "tips") dlg(statsTips());
