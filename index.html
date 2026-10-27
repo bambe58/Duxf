@@ -914,7 +914,7 @@ function sett() {
  ${P.allowed.map(u => `<div class="mem"><span class="g"><b>${esc(u.email)}</b><div class="mu">${u.is_admin ? "amministratore" : u.registered ? "registrato" : "in attesa del primo accesso"}</div></span>${u.is_admin || u.registered ? "" : `<button class="pill" data-act="allowdel" data-e="${esc(u.email)}">Togli</button>`}</div>`).join("")}
  <label>Abilita una nuova email</label><div class="row2"><input id="ae" type="email" placeholder="nome@email.it" autocomplete="off"><button class="pill on" data-act="allowadd">Abilita</button></div></div>` : "";
   const aspetto = `<div class="card"><h2>Aspetto</h2><div class="mu" style="margin:-4px 0 8px">Vale solo per il tuo account (${esc(me.name || "")}).</div>${SKINS.map(k => `<button class="skin ${k.id === SK ? "on" : ""}" data-act="skin" data-s="${k.id}"><span class="sws">${k.sw.map(c => `<i style="background:${c}"></i>`).join("")}</span><span class="g"><b>${k.n}</b><span class="mu">${k.d}</span></span><span class="chk">${k.id === SK ? "✓" : ""}</span></button>`).join("")}
- <button class="skin ${HAP ? "on" : ""}" data-act="haptic"><span class="g"><b>Vibrazione al tocco</b><span class="mu">Vibrazione leggera quando salvi o scegli (solo Android)</span></span><span class="chk">${HAP ? "✓" : ""}</span></button>
+ <button class="skin ${HAP ? "on" : ""}" data-act="haptic"><span class="g"><b>Vibrazione al tocco</b><span class="mu">Vibrazione leggera su ogni pulsante (solo Android)</span></span><span class="chk">${HAP ? "✓" : ""}</span></button>
 </div>`;
   return `<div class="view"><div class="card"><h2>Quota mensile ${y}</h2><label>Versamento mensile a testa (€)</label><input id="q" type="number" value="${quotaOf(y) || ""}" inputmode="decimal">
  ${S.quota[y] === undefined && quotaFrom(y) !== null ? `<div class="mu" style="margin-top:6px">Uguale a quella del ${quotaFrom(y)}. Modificala e salva solo se cambia.</div>` : ""}
@@ -1333,12 +1333,15 @@ document.addEventListener("visibilitychange", () => {
 
 /* ---------------- azioni ---------------- */
 let HAP = true; try { HAP = localStorage.getItem("duofin.haptic") !== "0"; } catch (_) { }
-const BUZZ = new Set(["save", "saveq", "saveicon", "wsave", "wcat", "wsub", "wwho", "wto", "wkey", "wtype", "add", "del", "dowipe"]);
+const BUZZ_DOUBLE = new Set(["del", "dowipe"]);   // vibrazione doppia per le azioni che cancellano
+document.addEventListener("click", e => {   // vibrazione leggera su ogni pulsante (solo Android)
+  const t = e.target.closest("button,[data-act]"); if (!HAP || !t || t.disabled || t.dataset.fired || !navigator.vibrate) return;
+  navigator.vibrate(BUZZ_DOUBLE.has(t.dataset.act) ? [14, 40, 14] : t.dataset.act === "wkey" ? 6 : 10);
+}, true);
 document.addEventListener("touchstart", () => { }, { passive: true });   // fa funzionare lo stato :active su iPhone
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return; const a = b.dataset.act, id = b.dataset.id;
   const first = !b.dataset.fired;
-  if (HAP && first && BUZZ.has(a) && navigator.vibrate) navigator.vibrate(a === "del" || a === "dowipe" ? [14, 40, 14] : a === "wkey" ? 6 : 10);
   if (first && b.classList.contains("bub") && !b.disabled) { b.dataset.fired = "1"; b.classList.add("hit"); setTimeout(() => b.click(), 130); return; }   // le bolle restano rimpicciolite un istante prima di passare al passo dopo
   if (a === "haptic") { HAP = !HAP; try { localStorage.setItem("duofin.haptic", HAP ? "1" : "0"); } catch (_) { } if (HAP && navigator.vibrate) navigator.vibrate(20); S.still = true; render(); return; }
   if (a === "tipgo") { $("#dlg").close(); S.tab = "stats"; ST.v = "trend"; ST.fc = b.dataset.fc || null; ST.fs = null; render(); window.scrollTo(0, 0); }
