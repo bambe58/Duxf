@@ -598,7 +598,7 @@ function home() {
  ${covE > 0 ? `<circle class="arc" cx="90" cy="90" r="74" stroke="${COL.E}" stroke-dasharray="0 ${C}" stroke-dashoffset="${-(cov("F") + cov("M"))}" data-d="${covE} ${C}"/>` : ""}</svg>
  <div class="mid"><div class="mu">quota fissata</div><div class="num" id="rec">0</div><div class="mu">€ al mese a testa</div></div></div>
  ${leg}
- <div class="chips"><div class="chip"><span class="mu">Spese</span><b>${eur(d.spent)}</b></div><div class="chip"><span class="mu">Versato</span><b>${eur(d.vs.F + d.vs.M)}</b></div>
+ <div class="chips"><div class="chip"><span class="mu">Spese</span><b>${eur(d.spent)}</b></div><div class="chip"><span class="mu">Versato</span><b>${eur(d.c.F + d.c.M + d.ex)}</b><span class="mu" style="font-size:10px">di cui diretti ${eur(d.vs.F + d.vs.M)}</span></div>
  <div class="chip"><span class="mu">Delta</span><b style="color:${d.saldo < 0 ? "#e5484d" : "var(--J)"}">${eur(d.saldo)}</b></div></div>
  ${cover}
  <div class="card"><h2>Ultimi Movimenti</h2>${recent.map(row).join("") || `<div class="empty">Ancora nessun movimento.<br>Premi + per aggiungere il primo.</div>`}</div>
