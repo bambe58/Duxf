@@ -101,6 +101,9 @@ dialog[open]{animation:pop .25s cubic-bezier(.2,.9,.3,1.2)}@keyframes pop{from{o
 .sub button{background:none;border:0;color:var(--mu);padding:0 0 0 6px}
 .sub.arch{opacity:.45;text-decoration:line-through}
 .mlab{display:grid;grid-template-columns:repeat(12,1fr);font-size:9px;color:var(--mu);text-align:center;margin-bottom:4px}
+.srcch{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}.srcch .pill{padding:6px 12px;font-size:13px}
+.vr{display:flex;justify-content:space-between;font-size:13px;margin-top:6px}.vr span{color:var(--mu)}
+.rleg{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:12px;margin:0 0 4px}.rleg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 .mtrk{position:relative;height:12px;border-radius:9px;background:var(--ln)}
 .mtrk .f{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:9px;transition:width 1.1s cubic-bezier(.2,.8,.2,1)}
 .mtrk::after{content:"";position:absolute;inset:0;border-radius:9px;background-image:repeating-linear-gradient(90deg,transparent 0,transparent calc(100%/12 - 2px),var(--card) calc(100%/12 - 2px),var(--card) calc(100%/12))}
@@ -300,8 +303,8 @@ const $ = s => document.querySelector(s), sum = a => a.reduce((s, x) => s + x, 0
 const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 const MESI_L = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const MESI = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
-const NAMES = { F: "Tu", M: "Partner", J: "Conto comune", E: "Extra" }, COL = { F: "var(--F)", M: "var(--M)", J: "var(--J)", E: "#f59e0b" };
-const HEX = { F: "#3d6bff", M: "#ff4f9a", J: "#12b5a0", E: "#f59e0b" };
+const NAMES = { F: "Tu", M: "Partner", J: "Conto comune", E: "Extra" }, COL = { F: "var(--F)", M: "var(--M)", J: "var(--J)", E: "#2fb344" };
+const HEX = { F: "#3d6bff", M: "#ff4f9a", J: "#12b5a0", E: "#2fb344" };
 const NOW = new Date(), CY = NOW.getFullYear(), CM = NOW.getMonth();
 const eur = n => Math.round(n).toLocaleString("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 const eur2 = n => n.toLocaleString("it-IT", { style: "currency", currency: "EUR" });
@@ -423,7 +426,7 @@ async function loadAll() {
   const [c, s, t, q, rc, lg] = await Promise.all([fetchAll("categories", "name"), fetchAll("subcategories", "name"), fetchAll("transactions", "tx_date"), fetchAll("year_settings", "year"), fetchAll("recurrences", "anchor_date"), sb.from("audit_log").select("*").order("at", { ascending: false }).range(0, 14)]);
   S.rec = {}; rc.forEach(r => S.rec[r.id] = { id: r.id, freq: r.freq, anchor: r.anchor_date, active: r.active }); S.log = lg.data || [];
   S.cats = c.map(x => ({ id: x.id, n: x.name, c: x.color, c0: x.color, i: x.icon, arch: x.archived, subs: s.filter(y => y.category_id === x.id).map(y => ({ id: y.id, n: y.name, i: y.icon || null, arch: y.archived })) }));
-  S.tx = t.map(x => ({ id: x.id, k: x.kind === "spesa" ? "s" : x.kind === "trasferimento" ? "t" : "v", a: x.amount_cents / 100, d: x.tx_date, cat: x.category_id || "", sub: x.subcategory_id || "", who: x.payer, to: x.payee || null, note: x.note || "", rec: x.rec_id || null }));
+  S.tx = t.map(x => ({ id: x.id, k: x.kind === "spesa" ? "s" : x.kind === "trasferimento" ? "t" : "v", a: x.amount_cents / 100, d: x.tx_date, cat: x.category_id || "", sub: x.subcategory_id || "", who: x.payer, to: x.payee || null, note: x.note || "", src: x.source || "", rec: x.rec_id || null }));
   S.quota = {}; q.forEach(r => S.quota[r.year] = r.monthly_quota_cents / 100);
   skinColors(); YC = {};
 }
@@ -506,6 +509,12 @@ function Y(y, cin) {
     const prev = S.tx.filter(x => x.k === "s" && +x.d.slice(0, 4) === y - 1), avg = spent / cd;
     for (let m = cd; m < 12; m++) proj += prev.length ? .5 * avg + .5 * am(mo(prev, m)) : avg;
   }
+  // versato "fino a oggi" (esclude i movimenti con data futura, mostrati a parte come programmati) e mesi dovuti
+  const td = iso(new Date()), due = y < CY ? 12 : y === CY ? CM + 1 : 0;
+  const cof = tt => { const a = z => am(z), sp2 = tt.filter(x => x.k === "s"), vr2 = tt.filter(x => x.k === "v"), v = { F: a(vr2.filter(x => x.who === "F")), M: a(vr2.filter(x => x.who === "M")) };
+    tt.filter(x => x.k === "t").forEach(x => { if (x.who === "J") v[x.to] -= x.a; else { v[x.who] -= x.a; v[x.to] += x.a; } });
+    return { F: v.F + a(sp2.filter(x => x.who === "F")), M: v.M + a(sp2.filter(x => x.who === "M")), ex: a(vr2.filter(x => x.who === "E")) }; };
+  const ct = cof(t.filter(x => x.d <= td)), cfull = cof(t), fut = { F: cfull.F - ct.F, M: cfull.M - ct.M, ex: cfull.ex - ct.ex };
   const Q = quotaOf(y), integr = Math.max(0, (proj - ex) / 2 - 12 * Q), c = { F: vs.F + pk.F, M: vs.M + pk.M };
   const dov = {}, cred = {};
   ["F", "M"].forEach(p => {
@@ -514,7 +523,7 @@ function Y(y, cin) {
     dov[p] = sf + Math.max(0, integr - ex); cred[p] = Math.max(0, ex - integr);
   });
   const ent = c.F + c.M + ex + cin.F + cin.M + 2 * Q * (12 - cd); // entrate stimate a fine anno: versato finora + quota sui mesi rimanenti
-  return { y, spent, pk, vs, c, spM, vrM, proj, Q, integr, dov, cred, cin, ent, delta: ent - proj, rec: Q + integr / 12, saldo: vs.F + vs.M + ex - jt, ex, open, cd, credNext: cred };
+  return { y, spent, pk, vs, c, spM, vrM, proj, Q, integr, dov, cred, cin, ent, delta: ent - proj, rec: Q + integr / 12, saldo: vs.F + vs.M + ex - jt, ex, open, cd, due, ct, fut, credNext: cred };
 }
 // Y con cache: calcola gli anni in ordine cosi' il credito di fine anno passa a quello dopo
 function YD(y) {
@@ -537,7 +546,7 @@ function row(x) {
   if (x.k === "t") return `<button class="row" data-act="edit" data-id="${x.id}"><div class="ic tri">⇄</div><div class="g"><div class="t">Trasferimento${x.note ? " · " + esc(x.note) : ""}</div>
  <div class="mu">${NAMES[x.who]} → ${NAMES[x.to]} · ${x.d.slice(8)}/${x.d.slice(5, 7)}/${x.d.slice(0, 4)}</div></div><div class="amt tra">${eur2(x.a)}</div></button>`;
   const k = cat(x.cat), v = x.k === "v";
-  return `<button class="row" data-act="edit" data-id="${x.id}"><div class="ic" style="--cc:${k.c}">${ico(subI(x.cat, x.sub) || k.i)}</div><div class="g"><div class="t">${v ? "Versamento" + (x.note ? " · " + esc(x.note) : "") : esc(subN(x.cat, x.sub) || k.n)}</div>
+  return `<button class="row" data-act="edit" data-id="${x.id}"><div class="ic" style="--cc:${k.c}">${ico(subI(x.cat, x.sub) || k.i)}</div><div class="g"><div class="t">${v ? "Versamento" + (x.src ? " · " + esc(x.src) : "") + (x.note ? " · " + esc(x.note) : "") : esc(subN(x.cat, x.sub) || k.n)}</div>
  <div class="mu">${v ? NAMES[x.who] : esc(k.n) + " · " + NAMES[x.who]} · ${x.d.slice(8)}/${x.d.slice(5, 7)}/${x.d.slice(0, 4)}${!v && x.note ? " · " + esc(x.note) : ""}${x.rec && S.rec[x.rec] && S.rec[x.rec].active ? ` · ↻ ${FRQ[S.rec[x.rec].freq]}` : ""}</div></div>
  <div class="amt ${v ? "pos" : ""}">${v ? "+" : "−"}${eur2(x.a)}</div></button>`;
 }
@@ -558,19 +567,25 @@ function actions() {
 }
 // schermata Home: Suggerimenti, anello della quota, riepilogo, copertura, ultimi movimenti e azioni
 function home() {
-  const d = YD(S.year), C = 2 * Math.PI * 74, cov = p => Math.min(d.c[p] / (d.proj || 1), .5) * C;
+  const d = YD(S.year), C = 2 * Math.PI * 74, cov = p => Math.min(d.ct[p] / (d.proj || 1), .5) * C, covE = Math.max(0, Math.min(d.ct.ex / (d.proj || 1), 1 - cov("F") / C - cov("M") / C)) * C;
   const recent = S.tx.filter(x => +x.d.slice(0, 4) === S.year).sort((a, b) => b.d.localeCompare(a.d)).slice(0, 4);
   const f1 = n => n.toFixed(1).replace(".", ","), tot = (12 * d.Q + d.integr) || 1;   /* obiettivo a testa = max(quota minima annua, meta' delle spese) */
-  const cvr = p => { const m = d.Q ? d.c[p] / d.Q : 0, pct = d.Q ? Math.min(100, Math.round(d.c[p] / tot * 100)) : 0;
+  const rq = d.Q * d.due, rl = d.open ? "Richiesto ad oggi" : "Richiesto";
+  const cvr = p => { const m = d.Q ? d.ct[p] / d.Q : 0, pr = rq > 0 ? Math.round(d.ct[p] / rq * 100) : null;
     return `<div class="prow"><div class="h"><span><span class="dot" style="background:${COL[p]}"></span>${NAMES[p]}</span><span><b>${f1(m)}</b> quote</span></div>
   <div class="mlab">${MESI.map(x => `<span>${x}</span>`).join("")}</div>
-  <div class="mtrk"><i class="f" data-w="${Math.min(m, 12) / 12 * 100}" style="background:${COL[p]}"></i><b class="tick" style="left:${d.cd / 12 * 100}%"></b></div>
-  <div class="mu" style="margin-top:6px">${eur(d.c[p])} / ${eur(tot)}, ${pct}% delle quote coperte${d.cin[p] >= 1 ? ` · credito dall'anno prima ${eur(d.cin[p])}` : ""}</div></div>`; };
+  <div class="mtrk"><i class="f" data-w="${Math.min(m, 12) / 12 * 100}" style="background:${COL[p]}"></i><b class="tick" style="left:${d.due / 12 * 100}%"></b></div>
+  <div class="vr"><span>Versato</span><b>${eur(d.ct[p])}</b></div><div class="vr"><span>${rl}</span><b>${eur(rq)}</b></div>
+  <div class="vr"><span>Versato / richiesto</span><b style="color:${pr === null ? "inherit" : pr >= 100 ? "var(--J)" : "#e5484d"}">${pr === null ? "–" : pr + "%"}</b></div>
+  ${d.fut[p] >= 1 ? `<div class="mu" style="margin-top:4px">Programmato (date future): ${eur(d.fut[p])}</div>` : ""}${d.cin[p] >= 1 ? `<div class="mu" style="margin-top:4px">Credito dall'anno prima ${eur(d.cin[p])}</div>` : ""}</div>`; };
+  const exRow = d.ct.ex >= 1 || d.fut.ex >= 1 ? `<div class="prow"><div class="h"><span><span class="dot" style="background:${COL.E}"></span>${NAMES.E} (da terzi)</span></div><div class="vr"><span>Versato</span><b>${eur(d.ct.ex)}</b></div>${d.fut.ex >= 1 ? `<div class="mu" style="margin-top:4px">Programmato (date future): ${eur(d.fut.ex)}</div>` : ""}</div>` : "";
+  const pc = v => Math.round(Math.min(Math.max(v / (d.proj || 1), 0), 1) * 100), pF = Math.round(cov("F") / C * 100), pM = Math.round(cov("M") / C * 100), pE = Math.round(covE / C * 100);
+  const leg = `<div class="rleg"><span><i style="background:var(--F)"></i>${esc(NAMES.F)} ${pF}%</span><span><i style="background:var(--M)"></i>${esc(NAMES.M)} ${pM}%</span>${d.ct.ex >= 1 ? `<span><i style="background:${COL.E}"></i>Extra ${pE}%</span>` : ""}<span><i style="background:var(--ln)"></i>Da coprire ${Math.max(0, 100 - pF - pM - pE)}%</span></div><div class="mu" style="text-align:center;margin-bottom:10px">Cerchio intero = spese stimate ${eur(d.proj)} nel ${S.year}</div>`;
   const cong = d.dov.F + d.dov.M, dl = d.delta, ovr = d.ent - 2 * tot,   /* quanto le entrate superano l'obiettivo dei due utenti: e' la parte che passa all'anno dopo */ sg = dl >= 1 ? "+" : dl <= -1 ? "−" : "";
   const done = S.year === CY ? CM : 0, cr = ["F", "M"].reduce((t, p) => t + (d.cred[p] >= 1 ? d.cred[p] : 0), 0); // ignora arrotondamenti sotto 1 €
   const ttl = d.open ? (done >= 1 ? `Delta (stima ${MESI_L[done - 1]})` : "Delta (stima)") : "Delta definitivo", crl = d.open ? "Credito totale (stimato)" : "Credito totale", cgl = d.open ? "Conguaglio totale (stimato)" : "Conguaglio totale", rsv = dl - (cr - cong);   /* parte del delta che resta nel conto comune (2n - S quando S < 2n) */
   const tbl = o => `<div style="display:grid;grid-template-columns:auto auto;justify-content:start;column-gap:14px">${["F", "M"].map(p => `<span>${NAMES[p]}</span><span style="text-align:right">${eur(o[p])}</span>`).join("")}</div>`;   // nomi allineati tra loro, importi allineati a destra
-  const cover = d.Q ? `<div class="card"><h2>Copertura della quota</h2>${cvr("F")}${cvr("M")}<div class="mu">La linea nera è il punto in cui dovreste essere oggi.</div></div>
+  const cover = d.Q ? `<div class="card"><h2>Copertura della quota</h2>${cvr("F")}${cvr("M")}${exRow}<div class="mu">La linea nera è il punto in cui dovreste essere oggi. “${rl}” = quota minima × mesi dovuti (${d.due} × ${eur(d.Q)}).</div></div>
  <div class="card"><h2>Riepilogo ${S.year}</h2><div class="two" style="row-gap:16px">
  ${true ? `<div><div class="mu">${ttl}</div><div class="big" style="color:${dl <= -1 ? "#e5484d" : "var(--J)"}">${sg}${eur(Math.abs(dl))}</div>${ovr >= 1 ? `<div class="mu">${eur(ovr)} oltre l'obiettivo</div>` : ""}</div>` : ""}
  <div><div class="mu">${cgl}</div><div class="big">${eur(cong)}</div><div class="mu">${cong >= 1 ? tbl(d.dov) : "nessun versamento extra"}</div></div>
@@ -579,8 +594,10 @@ function home() {
     : `<div class="card"><h2>Copertura della quota</h2><div class="empty">Imposta la quota mensile ${S.year} in Impostazioni per vedere copertura e conguaglio.</div></div>`;
   return `<div class="view"><button class="card tipbtn" data-act="tips"><span class="ti">💡</span><span class="g"><b>Suggerimenti</b><span class="mu">Quattro spunti dai vostri dati</span></span><span class="mu">›</span></button><div class="hero"><svg class="ring" viewBox="0 0 180 180"><circle class="trk" cx="90" cy="90" r="74"/>
  <circle class="arc" cx="90" cy="90" r="74" stroke="var(--F)" stroke-dasharray="0 ${C}" data-d="${cov("F")} ${C}"/>
- <circle class="arc" cx="90" cy="90" r="74" stroke="var(--M)" stroke-dasharray="0 ${C}" stroke-dashoffset="${-cov("F")}" data-d="${cov("M")} ${C}"/></svg>
+ <circle class="arc" cx="90" cy="90" r="74" stroke="var(--M)" stroke-dasharray="0 ${C}" stroke-dashoffset="${-cov("F")}" data-d="${cov("M")} ${C}"/>
+ ${covE > 0 ? `<circle class="arc" cx="90" cy="90" r="74" stroke="${COL.E}" stroke-dasharray="0 ${C}" stroke-dashoffset="${-(cov("F") + cov("M"))}" data-d="${covE} ${C}"/>` : ""}</svg>
  <div class="mid"><div class="mu">quota fissata</div><div class="num" id="rec">0</div><div class="mu">€ al mese a testa</div></div></div>
+ ${leg}
  <div class="chips"><div class="chip"><span class="mu">Spese</span><b>${eur(d.spent)}</b></div><div class="chip"><span class="mu">Versato</span><b>${eur(d.vs.F + d.vs.M)}</b></div>
  <div class="chip"><span class="mu">Delta</span><b style="color:${d.saldo < 0 ? "#e5484d" : "var(--J)"}">${eur(d.saldo)}</b></div></div>
  ${cover}
@@ -592,7 +609,7 @@ function home() {
 function mvFiltered() {
   const words = S.q.toLowerCase().split(/\s+/).filter(Boolean), mn = parseFloat(String(S.amin).replace(",", ".")), mx = parseFloat(String(S.amax).replace(",", "."));
   return S.tx.filter(x => (S.mall || +x.d.slice(0, 4) === S.year) && (S.mall || S.mf === null || +x.d.slice(5, 7) - 1 === S.mf)
-    && (!words.length || words.every(w => (x.note || "").toLowerCase().includes(w)))
+    && (!words.length || words.every(w => ((x.note || "") + " " + (x.src || "")).toLowerCase().includes(w)))
     && (S.mt === "" || (S.mt === "s" ? x.k === "s" : S.mt === "v" ? x.k === "v" : S.mt === "t" ? x.k === "t" : !!(x.rec && S.rec[x.rec])))
     && (!S.mc || x.cat === S.mc) && (!S.mw || x.who === S.mw) && (isNaN(mn) || x.a >= mn) && (isNaN(mx) || x.a <= mx))
     .sort((a, b) => b.d.localeCompare(a.d));
@@ -681,7 +698,16 @@ function statsOver() {
   const mx = cats[0].v;
   const bars = cats.map(c => `<div class="hrow"><span class="hl"><span class="dot" style="background:${c.c}"></span>${ico(c.i, 1)} ${esc(c.n)}</span><span class="trkb"><i data-w="${c.v / mx * 100}" style="background:${c.c}"></i></span><b class="hv">${eur(c.v)}</b></div>`).join("");
   return `<div class="view"><div class="card"><h2>Spese per categoria · ${y}</h2><div class="hb">${bars}</div></div>
- <div class="card" id="ovd">${overDonut()}</div></div>`;
+ <div class="card" id="ovd">${overDonut()}</div>${extraSrc()}</div>`;
+}
+// Extra per fonte: quanto versano i terzi, diviso per chi versa (anno scelto oppure tutti gli anni)
+function extraSrc() {
+  const all = ST.exall, ev = S.tx.filter(x => x.k === "v" && x.who === "E" && (all || yOf(x) === S.year)), by = {};
+  ev.forEach(x => { const k = x.src || "Non indicata"; by[k] = (by[k] || 0) + x.a; });
+  const arr = Object.entries(by).sort((a, b) => b[1] - a[1]), tot = sum(ev.map(x => x.a)), mx = arr.length ? arr[0][1] : 1;
+  const tg = `<div class="mchips" style="margin:6px 0 10px"><button class="pill ${all ? "" : "on"}" data-act="exall" data-v="">${S.year}</button><button class="pill ${all ? "on" : ""}" data-act="exall" data-v="1">Tutti gli anni</button></div>`;
+  if (!arr.length) return `<div class="card"><h2>Extra per fonte</h2>${tg}<div class="empty">Nessun versamento Extra${all ? "" : " nel " + S.year}.</div></div>`;
+  return `<div class="card" id="exs"><h2>Extra per fonte</h2>${tg}<div class="mu">Totale Extra ${eur(tot)}</div><div class="hb" style="margin-top:8px">${arr.map(([n, v]) => `<div class="hrow"><span class="hl"><span class="dot" style="background:${COL.E}"></span>${esc(n)}</span><span class="trkb"><i data-w="${v / mx * 100}" style="background:${COL.E}"></i></span><b class="hv">${eur(v)} · ${Math.round(v / tot * 100)}%</b></div>`).join("")}</div></div>`;
 }
 function overDonut() {
   const y = S.year, sp = S.tx.filter(x => x.k === "s" && yOf(x) === y);
@@ -982,13 +1008,17 @@ function dlg(html) { const d = $("#dlg"); d.innerHTML = html; if (!d.open) d.sho
 // gruppo di pulsanti a scelta singola
 function seg(el, opts, cur, key) { el.innerHTML = opts.map(o => `<button type="button" data-act="seg" data-key="${key}" data-v="${o[0]}" class="${o[0] === cur ? "on" : ""}" style="${o[0] === cur ? "background:" + o[2] : ""}">${o[1]}</button>`).join(""); }
 // popup di modifica di un movimento (id) o di creazione
+// fonti dei versamenti Extra gia' usate (le piu' frequenti prima) e riquadro "Fonte" con scelte rapide
+const srcList = () => { const m = {}; S.tx.forEach(x => { if (x.who === "E" && x.src) m[x.src] = (m[x.src] || 0) + 1; }); return Object.keys(m).sort((a, b) => m[b] - m[a] || a.localeCompare(b, "it")); };
+const srcBox = (id, val) => `<label for="${id}">Fonte (obbligatoria: chi versa)</label><input id="${id}" value="${esc(val || "")}" placeholder="es. Farmacia, Nonni…" autocomplete="off">
+ <div class="srcch">${srcList().map(n => `<button type="button" class="pill ${n === val ? "on" : ""}" data-act="srcpick" data-t="${id}" data-v="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
 function openForm(id) {
   const x = id ? S.tx.find(t => t.id === id) : null, c0 = S.cats.find(c => !c.arch && c.subs.some(s => !s.arch));
   if (!x && !c0) { toast("Crea prima una categoria in Impostazioni"); return; }
-  ED = x ? { ...x } : { id: null, k: "s", a: "", d: new Date().toISOString().slice(0, 10), cat: c0.id, sub: c0.subs.find(s => !s.arch).id, who: "J", note: "" };
+  ED = x ? { ...x } : { id: null, k: "s", a: "", d: new Date().toISOString().slice(0, 10), cat: c0.id, sub: c0.subs.find(s => !s.arch).id, who: "J", note: "", src: "" };
   dlg(`<h2 style="margin:0 0 4px">${ED.k === "s" ? "Modifica spesa" : ED.k === "t" ? "Modifica trasferimento" : "Modifica versamento"}</h2><label>Importo (€)</label><input id="fa" type="number" step="0.01" inputmode="decimal" value="${ED.a}">
  <label>Data</label><input id="fd" type="date" value="${ED.d}"><div id="fc"></div><label id="wl"></label><div class="seg" id="sw2"></div>${ED.k === "t" ? `<label id="wl2">A</label><div class="seg" id="sw3"></div>` : ""}
- <label id="nl">Nota (facoltativa)</label><input id="fn" value="${esc(ED.note)}">
+ <div id="fsw"></div><label id="nl">Nota (facoltativa)</label><input id="fn" value="${esc(ED.note)}">
  ${ED.k === "t" ? "" : (() => { const r = ED.rec ? S.rec[ED.rec] : null, on = !!(r && r.active); return `<div class="rrow"><label class="ck"><input type="checkbox" id="frc" ${on ? "checked" : ""}>Ricorrente</label><select id="ffr" aria-label="Frequenza" ${on ? "" : "disabled"}>${Object.entries(FRQ).map(([k, v]) => `<option value="${k}" ${k === (r ? r.freq : "m") ? "selected" : ""}>${v}</option>`).join("")}</select></div>
  <div class="mu" style="font-size:12px">${r ? (on ? "Spunta tolta = la ricorrenza termina e lo storico resta. I prossimi movimenti copiano l'ultimo della serie." : "Ricorrenza terminata. Rimetti la spunta per riattivarla.") : "Con la spunta, un movimento identico viene aggiunto in automatico a ogni scadenza."}</div>`; })()}<button class="btn" data-act="save">Salva</button>
  ${x ? `<button class="btn d" data-act="del">Elimina</button>` : ""}<button class="btn s" data-act="close">Annulla</button>`);
@@ -1001,7 +1031,7 @@ function drawForm() {
   if (ED.k === "t") ED.to = ED.who === "F" ? "M" : ED.who === "M" ? "F" : (ED.to === "M" ? "M" : "F");   // tra utenti la destinazione e' l'altro utente
   $("#wl").textContent = ED.k === "s" ? "Pagato da" : ED.k === "t" ? "Da" : "Versato da";
   seg($("#sw2"), (ED.k === "v" ? ["F", "M", "E"] : ["F", "M", "J"]).map(p => [p, NAMES[p], HEX[p]]), ED.who, "who");
-  { const nl = $("#nl"); if (nl) nl.textContent = ED.who === "E" ? "Nota (obbligatoria: scrivi chi versa)" : "Nota (facoltativa)"; }
+  { const nl = $("#nl"); if (nl) nl.textContent = "Nota (facoltativa)"; const fw = $("#fsw"); if (fw) { const on = ED.k === "v" && ED.who === "E", cur = $("#fsrc"); if (cur) ED.src = cur.value; fw.innerHTML = on ? srcBox("fsrc", ED.src) : ""; } }
   if (ED.k === "t") seg($("#sw3"), (ED.who === "J" ? ["F", "M"] : [ED.to]).map(p => [p, NAMES[p], HEX[p]]), ED.to, "to");
   const cats = S.cats.filter(c => !c.arch || c.id === ED.cat), cur = cat(ED.cat), subs = cur.subs.filter(s => !s.arch || s.id === ED.sub);
   $("#fc").innerHTML = ED.k === "s" ? `<label>Categoria</label><select id="fcat">${cats.map(c => `<option value="${c.id}" ${c.id === ED.cat ? "selected" : ""}>${esc(c.n)}</option>`).join("")}</select>
@@ -1014,7 +1044,7 @@ const wEl = () => $("#wheel");
 // apre il nuovo movimento a cerchi
 function wOpen() {
   if (!S.cats.some(c => !c.arch && c.subs.some(x => !x.arch))) { toast("Crea prima una categoria in Impostazioni"); return; }
-  W = { step: "amt", amt: "", kind: "s", who: null, to: null, cat: null, sub: null, d: iso(new Date()), note: "", ret: false, more: false, rec: false, freq: "m" };
+  W = { step: "amt", amt: "", kind: "s", who: null, to: null, cat: null, sub: null, d: iso(new Date()), note: "", ret: false, more: false, rec: false, freq: "m", src: "" };
   wEl().classList.add("on"); wDraw();
 }
 // chiude il nuovo movimento a cerchi e azzera lo stato
@@ -1050,7 +1080,7 @@ function wDraw() {
   let body = "";
   if (W.step === "amt") {
     const z = Math.min(vw, 330), cx = z / 2, cy = z * .53, d = z * .27, R = z * .37, cd = z * .34, len = wAmtTxt().length + 2;
-    const WH = SK === "blu" ? { F: "#ffffff", M: "#ffd54a", J: "#7fffd4", E: "#ffb74d" } : HEX, who = [[W.kind === "v" ? "E" : "J", W.kind === "v" ? WH.E : WH.J], ["M", WH.M], ["F", WH.F]].map(([p, c]) => ({ n: NAMES[p], c, who: true, act: "wwho", p }));
+    const WH = SK === "blu" ? { F: "#ffffff", M: "#ffd54a", J: "#7fffd4", E: "#7be08a" } : HEX, who = [[W.kind === "v" ? "E" : "J", W.kind === "v" ? WH.E : WH.J], ["M", WH.M], ["F", WH.F]].map(([p, c]) => ({ n: NAMES[p], c, who: true, act: "wwho", p }));
     const fs = Math.max(15, Math.min(30, cd * .8 / (len * .56)));
     body = `<div class="wst" style="width:${z}px;height:${z * .88}px">${wBubs(who, z, cx, cy, R, d)}${wCenter(z, cx, cy, cd, `<b style="font-size:${fs}px">${esc(wAmtTxt())} €</b><span class="mu">${WL[W.kind]}</span>`)}</div>
     <div class="wtype"><button class="${W.kind === "s" ? "on" : ""}" data-act="wtype" data-v="s"><span class="cb">✓</span>Spesa</button><button class="${W.kind === "v" ? "on" : ""}" data-act="wtype" data-v="v"><span class="cb">✓</span>Versamento</button><button class="${W.kind === "t" ? "on" : ""}" data-act="wtype" data-v="t"><span class="cb">✓</span>Trasferimento</button></div>
@@ -1087,14 +1117,15 @@ function wDraw() {
       <button class="wback" data-act="wback">← indietro</button>`;
     }
   } else {
-    const c = W.kind === "s" ? cat(W.cat) : null, sn = W.kind === "s" ? subN(W.cat, W.sub) : "", hx = p => SK === "blu" ? { F: "#ffffff", M: "#ffd54a", J: "#7fffd4", E: "#ffb74d" }[p] : HEX[p];
+    const c = W.kind === "s" ? cat(W.cat) : null, sn = W.kind === "s" ? subN(W.cat, W.sub) : "", hx = p => SK === "blu" ? { F: "#ffffff", M: "#ffd54a", J: "#7fffd4", E: "#7be08a" }[p] : HEX[p];
     body = `<div class="wsum">
      <button class="wr" data-act="wgo" data-s="amt"><span>Importo</span><b style="font-size:20px">${wFmt(wAmtNum())}</b></button>
      <button class="wr" data-act="wgo" data-s="amt"><span>${W.kind === "s" ? "Pagato da" : W.kind === "t" ? "Da" : "Versato da"}</span><b style="color:${hx(W.who)}">${esc(NAMES[W.who])}</b></button>
      ${W.kind === "t" ? `<button class="wr" data-act="wgo" data-s="${W.who === "J" ? "to" : "amt"}" ${W.who === "J" ? "" : "disabled style=\"cursor:default\""}><span>A</span><b style="color:${hx(W.to)}">${esc(NAMES[W.to])}</b></button>` : ""}
      ${W.kind === "s" ? `<button class="wr" data-act="wgo" data-s="cat"><span>Categoria</span><b>${esc(c.n)} › ${esc(sn)}</b></button>` : ""}
      <label class="wr" style="cursor:pointer"><span>Data</span><input id="wdt" type="date" value="${W.d}"></label>
-     <label class="wr" style="cursor:pointer"><span>Nota</span><input id="wnt" value="${esc(W.note)}" placeholder="${W.who === "E" ? "obbligatoria: scrivi chi versa" : "facoltativa"}"></label>
+     <label class="wr" style="cursor:pointer"><span>Nota</span><input id="wnt" value="${esc(W.note)}" placeholder="facoltativa"></label>
+     ${W.kind === "v" && W.who === "E" ? `<div class="wr" style="cursor:default;display:block">${srcBox("wsrc", W.src)}</div>` : ""}
      ${W.kind === "t" ? "" : `<div class="wr" style="cursor:default"><label class="ck" style="padding:0;border:0"><input type="checkbox" id="wrc" ${W.rec ? "checked" : ""}>Ricorrente</label><select id="wfr" aria-label="Frequenza" style="width:auto;padding:8px 10px" ${W.rec ? "" : "disabled"}>${Object.entries(FRQ).map(([k, v]) => `<option value="${k}" ${k === W.freq ? "selected" : ""}>${v}</option>`).join("")}</select></div>`}</div>
      <button class="btn" data-act="wsave">Salva</button>
      <button class="wback" data-act="wgo" data-s="${W.kind === "s" ? "cat" : "amt"}">← indietro</button>`;
@@ -1131,7 +1162,7 @@ document.addEventListener("input", e => {
   if (t.id === "msq") { S.q = t.value; S.mlim = 100; updMoves(); return; }
   if (t.id === "mfa") { S.amin = t.value; S.mlim = 100; updMoves(); return; }
   if (t.id === "mfb") { S.amax = t.value; S.mlim = 100; updMoves(); return; }
-  if (!W) return; if (e.target.id === "wdt") W.d = e.target.value; else if (e.target.id === "wnt") W.note = e.target.value; });
+  if (!W) return; if (e.target.id === "wdt") W.d = e.target.value; else if (e.target.id === "wnt") W.note = e.target.value; else if (e.target.id === "wsrc") W.src = e.target.value; });
 document.addEventListener("change", e => {
   const t = e.target;
   if (t.id === "mfc") { S.mc = t.value; S.mlim = 100; updMoves(); }
@@ -1374,6 +1405,7 @@ document.addEventListener("click", async e => {
   else if (a === "year") { S.year = +b.dataset.y; S.mf = null; S.drill = null; render(); }
   else if (a === "mf") { S.mf = b.dataset.m === "" ? null : +b.dataset.m; render(); }
   else if (a === "drill") { S.drill = id || null; const e = $("#ovd"); if (e && S.tab === "stats" && ST.v === "over") { e.innerHTML = overDonut(); $("#view")._h = null; } else render(); }
+  else if (a === "exall") { ST.exall = !!b.dataset.v; render(); }
   else if (a === "sv") { ST.v = b.dataset.v; S.drill = null; ST.ydd = false; render(); }
   else if (a === "ydd") { ST.ydd = !ST.ydd; S.still = true; render(); }
   else if (a === "savg") { ST.avg = !ST.avg; S.still = true; render(); }
@@ -1390,7 +1422,7 @@ document.addEventListener("click", async e => {
     W.kind = b.dataset.v; W.to = null; if ((W.kind === "v" && W.who === "J") || (W.kind !== "v" && W.who === "E")) W.who = null;
     document.querySelectorAll(".wtype button").forEach(x => x.classList.toggle("on", x.dataset.v === W.kind));
     const j = document.querySelector('#wheel .bub[data-p="J"], #wheel .bub[data-p="E"]');   // nei versamenti il cerchio del conto comune diventa "Extra"
-    if (j) { const e = W.kind === "v"; j.dataset.p = e ? "E" : "J"; j.setAttribute("aria-label", e ? NAMES.E : NAMES.J); j.querySelector(".bt").textContent = e ? NAMES.E : NAMES.J; j.style.setProperty("--cc", SK === "blu" ? (e ? "#ffb74d" : "#7fffd4") : (e ? HEX.E : HEX.J)); }
+    if (j) { const e = W.kind === "v"; j.dataset.p = e ? "E" : "J"; j.setAttribute("aria-label", e ? NAMES.E : NAMES.J); j.querySelector(".bt").textContent = e ? NAMES.E : NAMES.J; j.style.setProperty("--cc", SK === "blu" ? (e ? "#7be08a" : "#7fffd4") : (e ? HEX.E : HEX.J)); }
     const m = document.querySelector("#wc .mu"); if (m) m.textContent = { s: "importo", v: "versamento", t: "trasferimento" }[W.kind];
     const h = $("#whint"); if (h) h.textContent = { s: "Scrivi l'importo, poi tocca chi ha pagato", v: "Scrivi l'importo, poi tocca chi ha versato", t: "Scrivi l'importo, poi tocca chi trasferisce" }[W.kind];
   }
@@ -1419,13 +1451,15 @@ document.addEventListener("click", async e => {
     const p = { kind: W.kind === "s" ? "spesa" : W.kind === "t" ? "trasferimento" : "versamento", amount_cents: Math.round(wAmtNum() * 100), tx_date: W.d, payer: W.who, payee: W.kind === "t" ? W.to : null, note: W.note.trim(),
       category_id: W.kind === "s" ? W.cat : null, subcategory_id: W.kind === "s" ? W.sub : null };
     if (!(p.amount_cents > 0) || !p.tx_date || (W.kind === "t" && !W.to)) return;
-    if (p.payer === "E" && !p.note) { toast("Scrivi nella nota chi ha versato"); const n = $("#wnt"); if (n) n.focus(); return; }
+    p.source = p.payer === "E" ? (W.src || "").trim() : null;
+    if (p.payer === "E" && !p.source) { toast("Indica la fonte del versamento"); const n = $("#wsrc"); if (n) n.focus(); return; }
     const k = W.kind, rec = W.kind !== "t" && W.rec, fr = W.freq; S.year = +p.tx_date.slice(0, 4); wClose();
     run(async () => {
       if (rec) { const r = chk(await sb.from("recurrences").insert({ freq: fr, anchor_date: p.tx_date, active: true }).select().single()); p.rec_id = r.data.id; }
       chk(await sb.from("transactions").insert(p));
     }, (k === "s" ? "Spesa salvata" : k === "t" ? "Trasferimento salvato" : "Versamento salvato") + (rec ? ` · ricorrente ${FRQ[fr].toLowerCase()}` : "")).then(() => rec && runRecurrences());
   }
+  else if (a === "srcpick") { const t = $("#" + b.dataset.t); if (t) { t.value = b.dataset.v; if (W && t.id === "wsrc") W.src = b.dataset.v; else ED.src = b.dataset.v; b.parentNode.querySelectorAll(".pill").forEach(x => x.classList.toggle("on", x === b)); } }
   else if (a === "edit") openForm(id);
   else if (a === "seg") { ED[b.dataset.key] = b.dataset.v; drawForm(); }
   else if (a === "close") { $("#dlg").close(); armed = false; }
@@ -1434,7 +1468,8 @@ document.addEventListener("click", async e => {
     const p = { kind: ED.k === "s" ? "spesa" : ED.k === "t" ? "trasferimento" : "versamento", amount_cents: Math.round(v * 100), tx_date: $("#fd").value, payer: ED.who, payee: ED.k === "t" ? ED.to : null, note: $("#fn").value.trim(),
       category_id: ED.k === "s" ? $("#fcat").value : null, subcategory_id: ED.k === "s" ? $("#fsub").value : null };
     if (!p.tx_date) return;
-    if (p.payer === "E" && !p.note) { toast("Scrivi nella nota chi ha versato"); $("#fn").focus(); return; }
+    p.source = p.payer === "E" ? ($("#fsrc") ? $("#fsrc").value.trim() : (ED.src || "").trim()) : null;
+    if (p.payer === "E" && !p.source && !(ED.id && p.note)) { toast("Indica la fonte del versamento"); const n = $("#fsrc"); if (n) n.focus(); return; }
     $("#dlg").close(); S.year = +p.tx_date.slice(0, 4);
     const wantRec = ED.k !== "t" && $("#frc").checked, fr = ED.k === "t" ? "m" : $("#ffr").value, cur = ED.rec ? S.rec[ED.rec] : null;
     run(async () => {
