@@ -600,7 +600,7 @@ function home() {
  <div class="mid"><div class="mu">quota fissata</div><div class="num" id="rec">0</div><div class="mu">€ al mese a testa</div></div></div>
  ${leg}
  <div class="chips"><div class="chip"><span class="mu">Spese</span><b>${eur(d.spent)}</b><span class="mu cs">fine anno ${eur(d.proj)}</span></div><div class="chip"><span class="mu">Versato</span><b>${eur(d.c.F + d.c.M + d.ex)}</b><span class="mu cs">tutti i movimenti</span></div>
- <div class="chip"><span class="mu">Delta</span><b style="color:${d.c.F + d.c.M + d.ex - d.proj < 0 ? "#e5484d" : "var(--J)"}">${d.c.F + d.c.M + d.ex - d.proj < 0 ? "−" : ""}${eur(Math.abs(d.c.F + d.c.M + d.ex - d.proj))}</b><span class="mu cs">versato − spese stimate</span></div></div>
+ <div class="chip"><span class="mu">Delta</span><b style="color:${d.c.F + d.c.M + d.ex - d.spent < 0 ? "#e5484d" : "var(--J)"}">${d.c.F + d.c.M + d.ex - d.spent < 0 ? "−" : ""}${eur(Math.abs(d.c.F + d.c.M + d.ex - d.spent))}</b><span class="mu cs" style="color:${d.c.F + d.c.M + d.ex - d.proj < 0 ? "#e5484d" : "var(--J)"}">fine anno ${d.c.F + d.c.M + d.ex - d.proj < 0 ? "−" : ""}${eur(Math.abs(d.c.F + d.c.M + d.ex - d.proj))}</span></div></div>
  ${cover}
  <div class="card"><h2>Ultimi Movimenti</h2>${recent.map(row).join("") || `<div class="empty">Ancora nessun movimento.<br>Premi + per aggiungere il primo.</div>`}</div>
  ${actions()}</div>`;
