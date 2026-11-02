@@ -509,12 +509,12 @@ function Y(y, cin) {
     const prev = S.tx.filter(x => x.k === "s" && +x.d.slice(0, 4) === y - 1), avg = spent / cd;
     for (let m = cd; m < 12; m++) proj += prev.length ? .5 * avg + .5 * am(mo(prev, m)) : avg;
   }
-  // versato "fino a oggi" (esclude i movimenti con data futura, mostrati a parte come programmati) e mesi dovuti
+  // versato (tutti i movimenti, anche futuri) e mesi dovuti
   const td = iso(new Date()), due = y < CY ? 12 : y === CY ? CM + 1 : 0;
   const cof = tt => { const a = z => am(z), sp2 = tt.filter(x => x.k === "s"), vr2 = tt.filter(x => x.k === "v"), v = { F: a(vr2.filter(x => x.who === "F")), M: a(vr2.filter(x => x.who === "M")) };
     tt.filter(x => x.k === "t").forEach(x => { if (x.who === "J") v[x.to] -= x.a; else { v[x.who] -= x.a; v[x.to] += x.a; } });
     return { F: v.F + a(sp2.filter(x => x.who === "F")), M: v.M + a(sp2.filter(x => x.who === "M")), ex: a(vr2.filter(x => x.who === "E")) }; };
-  const ct = cof(t.filter(x => x.d <= td)), cfull = cof(t), fut = { F: cfull.F - ct.F, M: cfull.M - ct.M, ex: cfull.ex - ct.ex };
+  const cfull = cof(t), ct = cfull, fut = { F: 0, M: 0, ex: 0 };   // il versato conta TUTTI i movimenti, anche con data futura
   const Q = quotaOf(y), integr = Math.max(0, (proj - ex) / 2 - 12 * Q), c = { F: vs.F + pk.F, M: vs.M + pk.M };
   const dov = {}, cred = {};
   ["F", "M"].forEach(p => {
