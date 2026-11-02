@@ -32,7 +32,8 @@ h2{font-size:15px;margin:0 0 12px;font-weight:800}
 .num{font-size:44px;font-weight:800;letter-spacing:-.03em;line-height:1}
 .chips{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
 .chip{background:var(--card);border-radius:18px;padding:12px;box-shadow:var(--sh)}
-.chip b{display:block;font-size:17px;margin-top:3px}
+.chip{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:68px}
+.chip b{display:block;font-size:17px;margin-top:3px}.chip .cs{font-size:10px;white-space:nowrap;margin-top:2px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
 .prow{margin:12px 0}.prow .h{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:6px}
 .trkb{height:10px;border-radius:9px;background:var(--ln);overflow:hidden}.trkb i{display:block;height:100%;border-radius:9px;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
@@ -598,8 +599,8 @@ function home() {
  ${covE > 0 ? `<circle class="arc" cx="90" cy="90" r="74" stroke="${COL.E}" stroke-dasharray="0 ${C}" stroke-dashoffset="${-(cov("F") + cov("M"))}" data-d="${covE} ${C}"/>` : ""}</svg>
  <div class="mid"><div class="mu">quota fissata</div><div class="num" id="rec">0</div><div class="mu">€ al mese a testa</div></div></div>
  ${leg}
- <div class="chips"><div class="chip"><span class="mu">Spese</span><b>${eur(d.spent)}</b></div><div class="chip"><span class="mu">Versato</span><b>${eur(d.c.F + d.c.M + d.ex)}</b><span class="mu" style="font-size:10px;white-space:nowrap">diretti ${eur(d.vs.F + d.vs.M)}</span></div>
- <div class="chip"><span class="mu">Delta</span><b style="color:${d.saldo < 0 ? "#e5484d" : "var(--J)"}">${eur(d.saldo)}</b></div></div>
+ <div class="chips"><div class="chip"><span class="mu">Spese</span><b>${eur(d.spent)}</b><span class="mu cs">fine anno ${eur(d.proj)}</span></div><div class="chip"><span class="mu">Versato</span><b>${eur(d.c.F + d.c.M + d.ex)}</b></div>
+ <div class="chip"><span class="mu">Delta</span><b style="color:${d.saldo < 0 ? "#e5484d" : "var(--J)"}">${eur(d.saldo)}</b><span class="mu cs" style="color:${dl <= -1 ? "#e5484d" : "var(--J)"}">fine anno ${sg}${eur(Math.abs(dl))}</span></div></div>
  ${cover}
  <div class="card"><h2>Ultimi Movimenti</h2>${recent.map(row).join("") || `<div class="empty">Ancora nessun movimento.<br>Premi + per aggiungere il primo.</div>`}</div>
  ${actions()}</div>`;
