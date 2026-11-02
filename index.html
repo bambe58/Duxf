@@ -73,7 +73,7 @@ button,[data-act]{-webkit-tap-highlight-color:transparent;touch-action:manipulat
 .donut{display:flex;flex-direction:column;gap:14px;align-items:center}
 .donut svg{width:160px;height:160px;transform:rotate(-90deg)}.donut circle{fill:none;stroke-width:24;transition:stroke-width .2s;cursor:pointer}.donut circle:hover{stroke-width:30}
 .leg{width:100%}.lg{display:flex;align-items:center;gap:8px;font-size:13px;padding:5px 0;width:100%;background:none;border:0;text-align:left}
-.lg .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lg b{min-width:38px;text-align:right}
+.lg .pg{min-width:44px;text-align:right}.lg .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lg b{min-width:38px;text-align:right}
 input,select,textarea{width:100%;padding:11px 12px;border-radius:14px;border:1.5px solid var(--ln);background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
 textarea{font-family:ui-monospace,monospace;font-size:12px;height:150px}
 label{display:block;font-size:12px;color:var(--mu);margin:12px 0 4px;font-weight:600}
@@ -620,15 +620,15 @@ function moves() {
  <div class="card" id="mlist">${movesList()}</div></div>`;
 }
 // grafico a torta SVG con totale al centro
-function donut(items, total, center) {
-  const R = 56, C = 2 * Math.PI * R, pt = v => { const p = v / total * 100; return p > 0 && p < 1 ? "<1%" : Math.round(p) + "%"; }; let acc = 0;
+function donut(items, total, center, grand) {   // grand: totale di tutte le spese; se c'e', accanto a ogni % si mostra anche il peso sul totale
+  const R = 56, C = 2 * Math.PI * R, pf = (v, t) => { const p = v / t * 100; return p > 0 && p < 1 ? "<1%" : Math.round(p) + "%"; }, pt = v => pf(v, total), pg = v => pf(v, grand); let acc = 0;
   const arcs = items.map(it => {
     const len = Math.max(0, it.v / total * C - 2), o = acc; acc += it.v / total * C;
-    return `<circle cx="80" cy="80" r="${R}" style="stroke:${it.c}${it.id ? "" : ";cursor:default"}" stroke-dasharray="${len} ${C}" stroke-dashoffset="${-o}" ${it.id ? `data-act="drill" data-id="${it.id}"` : ""}><title>${esc(it.n)} ${eur(it.v)} · ${pt(it.v)}</title></circle>`;
+    return `<circle cx="80" cy="80" r="${R}" style="stroke:${it.c}${it.id ? "" : ";cursor:default"}" stroke-dasharray="${len} ${C}" stroke-dashoffset="${-o}" ${it.id ? `data-act="drill" data-id="${it.id}"` : ""}><title>${esc(it.n)} ${eur(it.v)} · ${pt(it.v)}${grand ? " (" + pg(it.v) + " del totale)" : ""}</title></circle>`;
   }).join("");
   return `<div class="donut"><div style="position:relative"><svg viewBox="0 0 160 160">${arcs}</svg><div class="mid"><b style="font-size:17px">${eur(total)}</b><span class="mu">${esc(center)}</span></div></div>
  <div class="leg">${items.map(it => { const tg = it.id ? `button class="lg" data-act="drill" data-id="${it.id}"` : `div class="lg"`;
-  return `<${tg}><span class="dot" style="background:${it.c}"></span><span class="nm">${esc(it.n)}</span><span class="mu">${eur(it.v)}</span><b>${pt(it.v)}</b></${it.id ? "button" : "div"}>`; }).join("")}</div></div>`;
+  return `<${tg}><span class="dot" style="background:${it.c}"></span><span class="nm">${esc(it.n)}</span><span class="mu">${eur(it.v)}</span><b>${pt(it.v)}</b>${grand ? `<span class="mu pg">(${pg(it.v)})</span>` : ""}</${it.id ? "button" : "div"}>`; }).join("")}</div></div>`;
 }
 
 /* ---------------- statistiche ---------------- */
@@ -696,8 +696,8 @@ function overDonut() {
   } else {
     items = cats.map(c => ({ n: c.n, v: c.v, c: c.c, id: c.id })); ctr = "spese " + y; head = "<h2>Dove vanno i soldi</h2>";
   }
-  const tt = sum(items.map(i => i.v));
-  return `${head}${donut(items, tt, ctr)}${S.drill ? "" : "<div class='mu' style='margin-top:6px'>Tocca una categoria per vedere le sottocategorie.</div>"}`;
+  const tt = sum(items.map(i => i.v)), all = sum(cats.map(i => i.v));
+  return `${head}${donut(items, tt, ctr, S.drill ? all : 0)}${S.drill ? `<div class='mu' style='margin-top:6px'>La prima percentuale è il peso dentro la categoria; tra parentesi il peso sul totale delle spese ${y}.</div>` : "<div class='mu' style='margin-top:6px'>Tocca una categoria per vedere le sottocategorie.</div>"}`;
 }
 
 /* ---- grafico a linee: mesi in ascissa, spesa in ordinata ---- */
